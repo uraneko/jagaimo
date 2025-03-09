@@ -160,12 +160,6 @@ where
                         }
                         // not enclosed by dbl quotes
                         [false, ..] => {
-                            // BUG
-                            // after the lexer takes an arg that is not dbl quote enclosed
-                            // it gets stuck here on all iterations of the
-                            // recursion
-                            // until it feeds all the words to the arg string and quits because
-                            // no more words can be found
                             if word.starts_with("--") || word.starts_with('-') {
                                 tokens.extend([
                                     Token::Arg(arg.0.drain(..).collect()),
@@ -206,7 +200,7 @@ pub enum ParseError {
     FoundScopeWithNoCommand,
     GotUnexpectedCommandAmongstOptions,
     GotUnexpectedScopeAmongstOptions,
-    ArgTokenHasEscapedTheOptionNet,
+    ArgTokenHasEscapedTheOptionNet(String),
 }
 
 pub fn parse<T>(mut tokens: T, mut call: CLICall) -> Result<CLICall, ParseError>
@@ -228,34 +222,54 @@ where
             }
             let next = next.unwrap();
             call.cmd = CLICommand::ScopedCommand {
-                scope: next.into(),
-                cmd: val,
+                scope: val,
+                cmd: next.into(),
             };
         }
         Token::Cmd(val) => call.cmd = CLICommand::Command(val),
         Token::Opt(val) => {
-            let next = tokens.next();
-            if next.is_none() {
-                call.opts.push(CLIOption::Option(val));
+            let res = resolve_opt_rec(&mut tokens, val, call);
+            if res.is_err() {
+                return res;
+            }
+            call = res.unwrap();
 
-                return Ok(call);
-            }
-            let next = next.unwrap();
-            match &next.to_u8() {
-                0 => return Err(ParseError::GotUnexpectedScopeAmongstOptions),
-                1 => return Err(ParseError::GotUnexpectedCommandAmongstOptions),
-                2 => call
-                    .opts
-                    .extend([CLIOption::Option(val), CLIOption::Option(next.into())]),
-                4 => call.opts.push(CLIOption::OptionWithArg {
-                    opt: val,
-                    arg: next.into(),
-                }),
-                val => unreachable!("no such variant value: {}", val),
-            }
+            return parse(tokens, call);
         }
-        Token::Arg(val) => return Err(ParseError::ArgTokenHasEscapedTheOptionNet),
+        Token::Arg(val) => return Err(ParseError::ArgTokenHasEscapedTheOptionNet(val)),
     }
 
     parse(tokens, call)
+}
+
+// resolves the recursion on the opt token
+// finishes and returns a clicall when it parses an opt with its arg
+// giving control back to the parse function
+fn resolve_opt_rec<T>(tokens: &mut T, tok: String, mut call: CLICall) -> Result<CLICall, ParseError>
+where
+    T: Iterator<Item = Token>,
+{
+    let next = tokens.next();
+    if next.is_none() {
+        call.opts.push(CLIOption::Option(tok));
+
+        return Ok(call);
+    }
+    let next = next.unwrap();
+
+    match next.to_u8() {
+        0 => return Err(ParseError::GotUnexpectedScopeAmongstOptions),
+        1 => return Err(ParseError::GotUnexpectedCommandAmongstOptions),
+        2 => {
+            call.opts.push(CLIOption::Option(tok));
+            return resolve_opt_rec(tokens, next.into(), call);
+        }
+        4 => call.opts.push(CLIOption::OptionWithArg {
+            opt: tok,
+            arg: next.into(),
+        }),
+        val => unreachable!("no such variant value: {}", val),
+    }
+
+    Ok(call)
 }
