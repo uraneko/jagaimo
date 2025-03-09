@@ -166,24 +166,30 @@ where
                             // recursion
                             // until it feeds all the words to the arg string and quits because
                             // no more words can be found
-                            let next = words.next();
-                            if next.is_none() {
-                                println!("{}, {}", line!(), arg.0);
-                                return tokens;
-                            }
-                            let next = next.unwrap();
-                            arg.0.push(' ');
-                            arg.0.push_str(&word);
-                            if next.starts_with("--") || next.starts_with('-') {
+                            if word.starts_with("--") || word.starts_with('-') {
                                 tokens.extend([
                                     Token::Arg(arg.0.drain(..).collect()),
                                     Token::Opt(word),
                                 ]);
                             } else {
+                                let next = words.next();
+                                if next.is_none() {
+                                    println!("{}, {}", line!(), arg.0);
+                                    return tokens;
+                                }
+                                let next = next.unwrap();
                                 arg.0.push(' ');
-                                arg.0.push_str(&next);
+                                arg.0.push_str(&word);
+                                if next.starts_with("--") || next.starts_with('-') {
+                                    tokens.extend([
+                                        Token::Arg(arg.0.drain(..).collect()),
+                                        Token::Opt(word),
+                                    ]);
+                                } else {
+                                    arg.0.push(' ');
+                                    arg.0.push_str(&next);
+                                }
                             }
-
                             // return lex(words, tokens, arg);
                         }
                     }
