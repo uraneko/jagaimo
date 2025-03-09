@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::mem::discriminant;
 
 #[repr(u8)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Token {
     Scope(String) = 0,
     Cmd(String) = 1,
@@ -46,7 +46,7 @@ impl From<Token> for String {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct CLICall {
     cmd: CLICommand,
     opts: Vec<CLIOption>,
@@ -61,19 +61,40 @@ impl Default for CLICall {
     }
 }
 
-#[derive(Debug)]
+impl CLICall {
+    pub fn cmd(mut self, cmd: impl Into<String>) -> Self {
+        self.cmd = CLICommand::Command(cmd.into());
+
+        self
+    }
+
+    pub fn opt_with_arg(mut self, opt: impl Into<String>, arg: impl Into<String>) -> Self {
+        self.opts.push(CLIOption::OptionWithArg {
+            opt: opt.into(),
+            arg: arg.into(),
+        });
+
+        self
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CLICommand {
     Command(String),
     ScopedCommand { scope: String, cmd: String },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CLIOption {
     Option(String),
     OptionWithArg { opt: String, arg: String },
 }
 
-pub fn tokenize(input: &str) -> Vec<String> {
+pub fn tokenize<T>(input: &str) -> Vec<T>
+where
+    T: Into<String>,
+    Vec<T>: FromIterator<String>,
+{
     input.split(' ').map(|s| s.to_owned()).collect()
 }
 
