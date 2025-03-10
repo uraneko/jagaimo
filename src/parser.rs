@@ -106,7 +106,7 @@ where
 {
     let word = words.next();
     if word.is_none() {
-        println!("{}", line!());
+        // println!("{}", line!());
         return tokens;
     }
     let word = word.unwrap();
@@ -117,7 +117,7 @@ where
         None => {
             let next = words.next();
             if next.is_none() {
-                println!("{}", line!());
+                // println!("{}", line!());
                 return vec![Token::Cmd(word)];
             }
             let next = next.unwrap();
@@ -189,7 +189,7 @@ where
                             } else {
                                 let next = words.next();
                                 if next.is_none() {
-                                    println!("{}, {}", line!(), arg.0);
+                                    // println!("{}, {}", line!(), arg.0);
                                     return tokens;
                                 }
                                 let next = next.unwrap();
