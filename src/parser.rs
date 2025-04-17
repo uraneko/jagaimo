@@ -1,27 +1,38 @@
 use std::collections::HashMap;
 use std::mem::discriminant;
 
-#[repr(u8)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Token {
-    Scope(String) = 0,
-    Cmd(String) = 1,
-    Opt(String) = 2,
-    Arg(String) = 4,
+    Scope(String),
+    Cmd(String),
+    Opt(String),
+    Arg(String),
+}
+
+struct ScopedCommand {
+    scope: String,
+    cmd: String,
+    opts: Vec<CLIOption>,
+}
+
+struct CLIParam(String);
+struct CLIArg(String);
+
+struct Command {
+    cmd: String,
+    opts: Vec<CLIOption>,
 }
 
 impl Token {
     fn to_u8(&self) -> u8 {
         match self {
-            Self::Scope(val) => 0,
-            Self::Cmd(val) => 1,
-            Self::Opt(val) => 2,
-            Self::Arg(val) => 4,
+            Self::Scope(_) => 0,
+            Self::Cmd(_) => 1,
+            Self::Opt(_) => 2,
+            Self::Arg(_) => 4,
         }
     }
-}
 
-impl Token {
     fn to_string(&self) -> String {
         match self {
             Self::Scope(val) => val.to_string(),
@@ -46,10 +57,16 @@ impl From<Token> for String {
     }
 }
 
+impl<'a> From<&'a Token> for &'a str {
+    fn from(value: &'a Token) -> Self {
+        value.as_str()
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct CLICall {
-    cmd: CLICommand,
-    opts: Vec<CLIOption>,
+    pub cmd: CLICommand,
+    pub opts: Vec<CLIOption>,
 }
 
 impl Default for CLICall {
@@ -80,6 +97,7 @@ impl CLICall {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CLICommand {
+    // None,
     Command(String),
     ScopedCommand { scope: String, cmd: String },
 }
@@ -88,6 +106,7 @@ pub enum CLICommand {
 pub enum CLIOption {
     Option(String),
     OptionWithArg { opt: String, arg: String },
+    // OptionWithArgs { opt: String, args: Vec<String> },
 }
 
 pub fn tokenize<T>(input: &str) -> Vec<T>
@@ -222,6 +241,25 @@ pub enum ParseError {
     GotUnexpectedCommandAmongstOptions,
     GotUnexpectedScopeAmongstOptions,
     ArgTokenHasEscapedTheOptionNet(String),
+}
+
+// parses the env args into a cli call
+pub fn parse_input() -> Result<CLICall, ParseError> {
+    let tokens = lex(std::env::args(), vec![], (String::new(), false));
+    let call = CLICall::default();
+    parse(tokens.into_iter(), call)
+}
+
+// parses an input str into a cli call
+pub fn parse_str<T>(input: T) -> Result<CLICall, ParseError>
+where
+    T: AsRef<str>,
+{
+    let input = input.as_ref();
+    let words = tokenize(input);
+    let tokens = lex(words.into_iter(), vec![], (String::new(), false));
+    let call = CLICall::default();
+    parse(tokens.into_iter(), call)
 }
 
 pub fn parse<T>(mut tokens: T, mut call: CLICall) -> Result<CLICall, ParseError>
