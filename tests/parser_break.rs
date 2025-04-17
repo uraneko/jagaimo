@@ -1,39 +1,47 @@
-use nikujaga::parser::{lex, parse, tokenize};
-use nikujaga::parser::{CLICall, Token};
+use nikujaga::parse_str;
+use nikujaga::{CLICall, CLICommand, CLIOption};
 
 #[test]
-// #[should_panic]
+#[should_panic]
 fn break_on_successive_args1() {
-    // cli command: \$> cat a.txt b.txt
-    // pass command words directly to the lexer
-    // lex the words into proper tokens
-    let tokens = lex(
-        ["a.txt", "b.txt"].into_iter().map(|w| w.to_string()),
-        vec![],
-        (String::new(), false),
-    );
-    println!("got {} tokens", tokens.len());
+    // cli command: $ cat a.txt b.txt
+    let in_call = "a.txt b.txt";
 
-    // parse the tokens into a CLICall
-    let call = parse(tokens.into_iter(), CLICall::default());
+    let out_call = CLICall {
+        cmd: CLICommand::Command("".into()),
+        opts: vec![
+            CLIOption::Option("a.txt".into()),
+            CLIOption::Option("b.txt".into()),
+        ],
+    };
+
+    // parse the command into a CLICall
+    let call = parse_str(in_call).unwrap();
     println!("the parsed command is: {:?}", call);
+
+    assert_eq!(call, out_call);
 }
 
 #[test]
-// #[should_panic]
+#[should_panic]
 fn break_on_successive_args2() {
-    // cli command: \$> git config --global user.email aaa@bbb.ccc
-    // tokenize the cli command into words
-    let mut words = tokenize("git config --global user.email aaa@bbb.ccc").into_iter();
-    // ignore the cli program name word; `git`
-    words.next();
-    println!("tokenized command into words: {:?}", words);
+    // cli command: $ git config --global user.email aaa@bbb.ccc
+    let in_call = "config --global user.email aaa@bbb.ccc";
 
-    // lex the words into proper tokens
-    let tokens = lex(words.into_iter(), vec![], (String::new(), false));
-    println!("got {} tokens", tokens.len());
+    let out_call = CLICall {
+        cmd: CLICommand::Command("config".to_string()),
+        opts: vec![
+            CLIOption::Option("--global".into()),
+            CLIOption::OptionWithArg {
+                opt: "user.email".into(),
+                arg: "aaa@bbb.ccc".into(),
+            },
+        ],
+    };
 
-    // parse the tokens into a CLICall
-    let call = parse(tokens.into_iter(), CLICall::default());
+    // parse the command into a CLICall
+    let call = parse_str(in_call).unwrap();
     println!("the parsed command is: {:?}", call);
+
+    assert_eq!(call, out_call);
 }
