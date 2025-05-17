@@ -1,22 +1,10 @@
-use nikujaga::parser::{lex, parse, tokenize};
 use nikujaga::parser::{CLICall, Token};
-
-#[test]
-#[ignore = "this doesn't necessitate a test"]
-fn test_tokenize() {
-    let s = "a123 random t#est @string !here \"{ }\
-        as dask";
-
-    assert_eq!(
-        vec!["a123", "random", "t#est", "@string", "!here", "\"{", "}as", "dask"],
-        tokenize(s)
-    );
-}
+use nikujaga::parser::{lex, parse, tokenize as chunkify};
 
 #[test]
 fn test_lex() {
     let cmd = "git config --global user.email";
-    let mut words = tokenize(cmd).into_iter();
+    let mut words = chunkify(cmd).into_iter();
     // get rid of the program name
     words.next();
 
