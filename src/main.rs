@@ -1,9 +1,11 @@
-use nikujaga::parser_kai2::{CommandParser, DefaultParser};
+use nikujaga::parsing::*;
+use nikujaga::parsing::{lex::Lex, parse::Parse};
+
 fn main() {
     // "build --release --no-default-features --features \"nightly binary encoding_decoding\"";
-    let mut args = std::env::args();
-    args.next();
-
+    let args = args();
     println!("{:?}", args);
-    println!("{:#?}", DefaultParser::lex(args));
+
+    let tokens: Vec<lex::Token> = lex::DefaultLexer::lex(args).collect();
+    println!("{:#?}", tokens);
 }
