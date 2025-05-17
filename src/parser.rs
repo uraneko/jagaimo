@@ -9,20 +9,6 @@ pub enum Token {
     Arg(String),
 }
 
-struct ScopedCommand {
-    scope: String,
-    cmd: String,
-    opts: Vec<CLIOption>,
-}
-
-struct CLIParam(String);
-struct CLIArg(String);
-
-struct Command {
-    cmd: String,
-    opts: Vec<CLIOption>,
-}
-
 impl Token {
     fn to_u8(&self) -> u8 {
         match self {
@@ -43,10 +29,10 @@ impl Token {
     }
     fn as_str(&self) -> &str {
         match self {
-            Self::Scope(ref val) => val,
-            Self::Cmd(ref val) => val,
-            Self::Opt(ref val) => val,
-            Self::Arg(ref val) => val,
+            Self::Scope(val) => val,
+            Self::Cmd(val) => val,
+            Self::Opt(val) => val,
+            Self::Arg(val) => val,
         }
     }
 }
@@ -97,16 +83,16 @@ impl CLICall {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CLICommand {
-    // None,
+    None,
     Command(String),
     ScopedCommand { scope: String, cmd: String },
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CLIOption {
-    Option(String),
+    Param(String),
     OptionWithArg { opt: String, arg: String },
-    // OptionWithArgs { opt: String, args: Vec<String> },
+    OptionWithArgs { opt: String, args: Vec<String> },
 }
 
 pub fn tokenize<T>(input: &str) -> Vec<T>
@@ -310,7 +296,7 @@ where
 {
     let next = tokens.next();
     if next.is_none() {
-        call.opts.push(CLIOption::Option(tok));
+        call.opts.push(CLIOption::Param(tok));
 
         return Ok(call);
     }
@@ -320,7 +306,7 @@ where
         0 => return Err(ParseError::GotUnexpectedScopeAmongstOptions),
         1 => return Err(ParseError::GotUnexpectedCommandAmongstOptions),
         2 => {
-            call.opts.push(CLIOption::Option(tok));
+            call.opts.push(CLIOption::Param(tok));
             return resolve_opt_rec(tokens, next.into(), call);
         }
         4 => call.opts.push(CLIOption::OptionWithArg {
