@@ -8,4 +8,6 @@ fn main() {
 
     let tokens: Vec<lex::Token> = lex::DefaultLexer::lex(args).collect();
     println!("{:#?}", tokens);
+    let parsed = parse::DefaultParser::parse(tokens.into_iter());
+    println!("{:#?}", parsed);
 }

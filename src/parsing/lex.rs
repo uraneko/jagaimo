@@ -52,8 +52,18 @@ pub enum Token {
 
 #[derive(Debug)]
 pub struct Flag {
-    prefix: Prefix,
-    value: String,
+    pub(crate) prefix: Prefix,
+    pub(crate) value: String,
+}
+
+impl Flag {
+    fn value(&self) -> String {
+        self.value.clone()
+    }
+
+    fn value_ref(&self) -> &str {
+        &self.value
+    }
 }
 
 // TODO error handling in these fns
@@ -144,48 +154,55 @@ impl Lex for DefaultLexer {
                 Token::Str(val)
             }
         })
-
-        // let mut temp = String::new();
-        // while let Some(val) = input.next() {
-        //     if temp.is_empty() {
-        //         if val.starts_with('"') {
-        //             temp.push_str(&val);
-        //         } else {
-        //
-        //         }
-        //     } else {
-        //         temp.push_str(&val);
-        //         if val.ends_with('"') {
-        //
-        //         } else {
-        //
-        //         }
-        //     }
-        //
-        // }
     }
 
     fn overload_bool(value: &str) -> Option<bool> {
         match value {
             "yes" => Some(true),
-            "1" => Some(true),
             "no" => Some(false),
-            "0" => Some(false),
             _ => None,
         }
     }
 
-    fn overload_flag(value: &str) -> Option<Flag> {
-        match value {
-            "bind" => Some(Flag {
-                prefix: Prefix::HyphenLess,
-                value: value.into(),
-            }),
-            "0.0a+dev_98.423" => Some(Flag {
-                prefix: Prefix::HyphenLess,
-                value: format!("version {}", value),
-            }),
-            _ => None,
+    // fn overload_flag(value: &str) -> Option<Flag> {
+    //     match value {
+    //         "bind" => Some(Flag {
+    //             prefix: Prefix::HyphenLess,
+    //             value: value.into(),
+    //         }),
+    //         "0.0a+dev_98.423" => Some(Flag {
+    //             prefix: Prefix::HyphenLess,
+    //             value: format!("version {}", value),
+    //         }),
+    //         _ => None,
+    //     }
+    // }
+}
+
+impl Token {
+    pub fn as_u8(&self) -> u8 {
+        match self {
+            Self::Str(_) => 0,
+            Self::Bool(_) => 1,
+            Self::Int(_) => 2,
+            Self::Float(_) => 4,
+            Self::Flag(_) => 8,
         }
+    }
+
+    pub fn value(&self) -> String {
+        let Self::Flag(f) = self else {
+            panic!("{:?}", self)
+        };
+
+        f.value()
+    }
+
+    pub fn value_ref(&self) -> &str {
+        let Self::Flag(f) = self else {
+            panic!("{:?}", self)
+        };
+
+        f.value_ref()
     }
 }
