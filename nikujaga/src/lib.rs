@@ -1,8 +1,4 @@
-pub mod parsers;
-pub mod parsing;
-
-use parsers::*;
-use parsing::*;
+use nikujaga_macro::nikujaga;
 
 // DOCS
 // given a cli command of unknown structure
@@ -27,12 +23,12 @@ use parsing::*;
 //
 // implement both ways
 
-struct ShortFormat;
+// struct ShortFormat;
 
 // internal implementation details
-struct Parser<ShortFormat> {
-    data: std::marker::PhantomData<ShortFormat>,
-}
+// struct Parser<ShortFormat> {
+//     data: std::marker::PhantomData<ShortFormat>,
+// }
 
 // DOCS
 // make it so that commands get lexed then parsed to a format then parsed to command representation
@@ -114,7 +110,8 @@ struct Parser<ShortFormat> {
 //
 // HOWTO:
 // * define all the possible rules
-// * define all the possible flags (AliasWhenPossible is a flag), flags are rule bound
+// * define all the possible flags (AliasWhenPossible is a flag), flags apply to rule types
+// (r.g., a flag for regions rule)
 // * define all the possible attributes (#[no_help] is an attribute), attrs apply to the macro
 // * define the valid syntax of all the rules, flags and attributes
 // * parse all the rules, flags and attrs into their asts
@@ -132,119 +129,100 @@ struct Parser<ShortFormat> {
 //
 // TODO: add support for auto gen of fish shell and nushell completions (completion.fish/nu files)
 // for the macro created cli tool
-NikuJaga! {
-    semantics: Vec<Semantics>,
-    vec![
-        meta: Semantics::OPS,
-        functional: Semantics::BARE
-    ]
+// nikujaga! {
+//     semantics: Vec<Semantics>,
+//     values: Vec::from([
+//         meta: Semantics::OPS,
+//         functional: Semantics::BARE
+//     ]),
+//
+//     regions: Regions {
+//         syntax: Syntax,
+//         values: Vec<String>,
+//
+//     },
+//     // AliasWhenPossible
+//     // vec![
+//     //  collections, remote, databases, history, help <- help is auto generated
+//     // ]
+//     operations: Operations {
+//         syntax: Syntax,
+//         values: Vec<Scoped { scope: Scope,  values: Vec<String> }>,
+//     },
+//     // syntax UpperShort LowerLong | Snake
+//     // <- the 2 syntaxes means that user of cli can pass
+//     // either cli collections list ...
+//     // or     cli collections l ...
+//     // both would be valid
+//     // vec![
+//     //  { collections [list, add, remove, edit, view] }
+//     //  same as { region(collections) [list, add, remove, edit, view] }
+//     //  <- operations of the collections region
+//     //  { [reset, reload, meta, version <- version is auto added here ] }
+//     //  same as { !region [reset, reload, meta, version ] }
+//     //  <- operations that apply directly to cli tool
+//     //  ...
+//     // ]
+//     flags: Flags {
+//         syntax: Syntax,
+//         values: Vec<Scoped{ scope: Scope, values: Vec<String> }>,
+//     },
+//     // syntax LowerLong | Kebab Snake | AliasWhenPossible
+//     // all flags chars have to be in lower case
+//     // *  both kebab and snake cases work
+//     // -> both --my-flag and --my_flag are valid
+//     // *  both lowerlong and lowershort work
+//     // -> this makes both --my-flag --my_flag valid
+//     // flag --my-flag wont have an alias
+//     // but  --flag can have -f or -F aliases as a short form
+//     // as long as other flags didnt already take both aliases
+//     // then --flag wont have any aliases either
+//     // vec![
+//     //  { operation(add) [ git ] }, <- for all scopes that end with add
+//     //  { r(colls) o(add) [ filter-existing ] }
+//     // <- for the root -> r(colls) -> o(add) scope
+//     // overwrites the more general o(add) rule
+//     //  { [ delim, glob ] } <- for the root scope
+//     // ]
+//     params: Params {
+//         values: Vec<Scoped{ scope: Scope, values: Vec<String> }>,
+//     },
+//     // NoDirectParams <- turns off scope params = all params must come from a flag
+//     // vec![
+//     //  { operation(add) [String] },
+//     //  all add operations no matter what region (including !region) they are called on
+//     //  can only take a single string parameter
+//     //  * this is valid:     cli region add "my string value"
+//     //  * also valid:        cli add "my string value"
+//     //  * this is not valid: cli region add 765
+//     //  * also not valid:    cli add "some str" "and then" "another"
+//     //  { ! [u8, String, String+u8] },
+//     //  this makes this valid:      cli "str"
+//     //  as well as this:            cli 23
+//     //  while this is invalid:      cli 434 <- 434 > u8::MAX
+//     //  this is also valid:         cli 123 "string" <- due to the last rule String+u8
+//     //  params are interchangeable: cli "string" 123
+//     //  { region(collections) operation(add) Flag(source) [Vec<String>, Path] },
+//     //  rule for the same operation add that is defined above for all uses
+//     //  this smaller scoped rule takes precedence over the more general rule
+//     //  so this:  cli collections add "this" "and that" <- is valid
+//     //  but this: cli collections add "str" <- is not valid
+//     //  (cant use general rule, when specific rule exists)
+//     //  { operation(add) flag(git) [URI] }
+//     //  the previously defined git flag of the add operation can only take a param of
+//     //  the URI type
+//     // ]
+//     descriptions: Descriptions,
+//
+//     // TODO use rust's type system to check validity of passed parameters
+//     //
+// }
 
-    regions: Regions {
-        syntax: Syntax,
-        values: Vec<String>,
-
-    },
-    // AliasWhenPossible
-    // vec![
-    //  collections, remote, databases, history, help
-    // ]
-    operations: Operations {
-        syntax: Syntax,
-        values: Vec<Scoped { scope: Scope,  values: Vec<String> }>,
-    },
-    // syntax UpperShort LowerLong | Snake
-    // <- the 2 syntaxes means that user of cli can pass
-    // either cli collections list ...
-    // or     cli collections l ...
-    // both would be valid
-    // vec![
-    //  { collections [list, add, remove, edit, view] }
-    //  same as { region(collections) [list, add, remove, edit, view] }
-    //  <- operations of the collections region
-    //  { [reset, reload, meta, version <- version is auto added here ] }
-    //  same as { !region [reset, reload, meta, version ] }
-    //  <- operations that apply directly to cli tool
-    //  ...
-    // ]
-    flags: Flags {
-        syntax: Syntax,
-        values: Vec<Scoped{ scope: Scope, values: Vec<String> }>,
-    },
-    // syntax LowerLong | Kebab Snake | AliasWhenPossible
-    // all flags chars have to be in lower case
-    // *  both kebab and snake cases work
-    // -> both --my-flag and --my_flag are valid
-    // *  both lowerlong and lowershort work
-    // -> this makes both --my-flag --my_flag valid
-    // flag --my-flag wont have an alias
-    // but  --flag can have -f or -F aliases as a short form
-    // as long as other flags didnt already take both aliases
-    // then --flag wont have any aliases either
-    // vec![
-    //  { operation(add) [ git ] }
-    // ]
-    params: Params {
-        values: Vec<Scoped{ scope: Scope, values: Vec<String> }>,
-    },
-    // NoDirectParams <- turns off direct params = all params must come from a flag
-    // vec![
-    //  { operation(add) [String] },
-    //  all add operations no matter what region (including !region) they are called on
-    //  can only take a single string parameter
-    //  * this is valid:     cli region add "my string value"
-    //  * also valid:        cli add "my string value"
-    //  * this is not valid: cli region add 765
-    //  * also not valid:    cli add "some str" "and then" "another"
-    //  { ! [u8, String, String+u8] },
-    //  this makes this valid:      cli "str"
-    //  as well as this:            cli 23
-    //  while this is invalid:      cli 434 <- 434 > u8::MAX
-    //  this is also valid:         cli 123 "string" <- due to the last rule String+u8
-    //  params are interchangeable: cli "string" 123
-    //  { region(collections) operation(add) Flag(source) [Vec<String>, Path] },
-    //  rule for the same operation add that is defined above for all uses
-    //  this smaller scoped rule takes precedence over the more general rule
-    //  so this:  cli collections add "this" "and that" <- is valid
-    //  but this: cli collections add "str" <- is not valid
-    //  (cant use general rule, when specific rule exists)
-    //  { operation(add) flag(git) [URI] }
-    //  the previously defined git flag of the add operation can only take a param of
-    //  the URI type
-    // ]
-    descriptions: Descriptions,
-
-    // TODO use rust's type system to check validity of passed parameters
-    //
-}
-
-enum Scope {
-    Region(String),
-    Flag(String),
-    Operation(String),
-}
-
-enum Syntax {}
-
-#[derive(Debug, Default)]
-struct Semantics {
-    regions: bool,
-    operations: bool,
-}
-
-impl Semantics {
-    const FULL: Self = Self {
-        operations: true,
-        regions: true,
-    };
-    const OPS: Self = Self {
-        operations: true,
-        regions: false,
-    };
-    const BARE: Self = Self {
-        regions: false,
-        operations: false,
-    };
-    // NOTE no point in a cli tool that takes regions with no operations
+nikujaga! {
+    r { [ collections, add, remove, list, view ] }
+    o { collections [ list, add, remove, edit, view ] }
+    f { r(collections) o(list) [ max, query, tag ] }
+    p { r(history) o(view) [ u8, (String, bool), (String, Vec<i32>, char) ] }
 }
 
 // add trait Command {
@@ -348,4 +326,4 @@ impl Semantics {
 // #[no_version]
 //
 // #[derive(nikujaga)]
-struct ExampleParser {}
+// struct ExampleParser {}

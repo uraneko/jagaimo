@@ -1,0 +1,11 @@
+[regions]
+collections = "operations for managing collections"
+
+[operations]
+add = "create a new item and add it to existing group"
+# this superseed the above general description for the add ope when the region is collections 
+collections:add = "add a new collection to the database"
+
+[flags]
+# the syntax <r|o> means replace itself with the region name, and if there is no region for that flag's scope then with operation name
+size = "specify the size of the <r|o> "
