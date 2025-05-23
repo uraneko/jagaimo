@@ -219,7 +219,7 @@ use nikujaga_macro::nikujaga;
 // }
 
 nikujaga! {
-    r { [ collections, add, remove, list, view ] }
+    r { [ collections, tags, history, algos ] }
     o { collections [ list, add, remove, edit, view ] }
     f { r(collections) o(list) [ max, query, tag ] }
     p { r(history) o(view) [ u8, (String, bool), (String, Vec<i32>, char) ] }

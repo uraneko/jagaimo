@@ -9,9 +9,9 @@
 //! * f(lag) => defines the possible flags of a scope
 //! * p(arameter) => defines the possible parameter(s) and their types for a given scope(s)
 //! * t(ransform) => defines a transformation that takes a token and transforms it into another
-//!     * t.r(eplace) => takes an input and output token, replace input with output
+//!     * tr(eplace) => takes an input and output token, replace input with output
 //!     // TODO this should take a scope also, and maybe a position
-//!     * t.f(unctional) => takes an input token pattern and a closure that returns another token
+//!     * tf(unctional) => takes an input token pattern and a closure that returns another token
 //! NOTE specific rules always overwrite more general rules
 //! i.e., { r(colls) o(add) [...] } always superseeds { o(add) [...] }
 //! for the root -> r(colls) -> o(add) scope
@@ -39,7 +39,7 @@ use syn::parse::{Parse, ParseStream, Result as ParseResult};
 use syn::{Expr, Ident, Token, Type};
 use syn::{braced, bracketed, parenthesized};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct RegionsRule {
     regions: Vec<Ident>,
 }
@@ -170,16 +170,12 @@ impl Parse for ParameterRule {
         let mut idents: Vec<Ident> = vec![];
         let mut scope = vec![];
         let mut temp;
-        loop {
-            if content.peek(Ident::peek_any) {
-                scope.extend([Ident::parse(&content)?, {
-                    let _paren = parenthesized!(temp in content);
+        while content.peek(Ident::peek_any) {
+            scope.extend([Ident::parse(&content)?, {
+                let _paren = parenthesized!(temp in content);
 
-                    Ident::parse(&temp)?
-                }]);
-            } else {
-                break;
-            }
+                Ident::parse(&temp)?
+            }]);
         }
         let bracket = bracketed!(content in content);
         let arr = content
@@ -244,36 +240,57 @@ impl Default for Attributes {
 
 #[derive(Debug, Default)]
 pub(crate) struct RuleBook {
-    regions: Vec<RegionsRule>,
-    ops: Vec<OperationRule>,
+    regions: RegionsRule,
+    opes: Vec<OperationRule>,
     flags: Vec<FlagRule>,
     params: Vec<ParameterRule>,
     transforms: Vec<TransformRule>,
-    attrs: Attributes,
 }
 
+impl RuleBook {
+    fn regions(&mut self, r: RegionsRule) {
+        self.regions = r;
+    }
+
+    fn operation(&mut self, ope: OperationRule) {
+        self.opes.push(ope);
+    }
+
+    fn flag(&mut self, f: FlagRule) {
+        self.flags.push(f);
+    }
+
+    fn param(&mut self, p: ParameterRule) {
+        self.params.push(p);
+    }
+
+    fn transform(&mut self, t: TransformRule) {
+        self.transforms.push(t);
+    }
+}
+
+// use std::sync::LazyLock;
+// const R: LazyLock<Ident> = LazyLock::new(|| Ident::new("r", Span::call_site()));
+// const O: LazyLock<Ident> = LazyLock::new(|| Ident::new("o", Span::call_site()));
+// const F: LazyLock<Ident> = LazyLock::new(|| Ident::new("f", Span::call_site()));
+// const P: LazyLock<Ident> = LazyLock::new(|| Ident::new("p", Span::call_site()));
+// const TR: LazyLock<Ident> = LazyLock::new(|| Ident::new("t.r", Span::call_site()));
+// const TF: LazyLock<Ident> = LazyLock::new(|| Ident::new("t.f", Span::call_site()));
+
+// TODO add support for random rules positioning
 impl Parse for RuleBook {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
-        let reg = Ident::parse(stream)?;
-        println!("\n\nPARSED IDENTIFIER = r\n{:?}", reg);
-        let regions = RegionsRule::parse(stream)?;
-        println!("{:?}", regions);
+        let mut rb = Self::default();
+        while stream.peek(Ident::peek_any) {
+            match &Ident::parse(stream)?.to_string()[..] {
+                "r" => rb.regions(RegionsRule::parse(stream)?),
+                "o" => rb.operation(OperationRule::parse(stream)?),
+                "f" => rb.flag(FlagRule::parse(stream)?),
+                "p" => rb.param(ParameterRule::parse(stream)?),
+                val => panic!("expected R, O, F, P, TR or TF; found {:?}", val),
+            }
+        }
 
-        let ops = Ident::parse(stream)?;
-        println!("\n\nPARSED IDENT = o\n{:?}", ops);
-        let op = OperationRule::parse(stream)?;
-        println!("{:?}", op);
-
-        let flg = Ident::parse(stream)?;
-        println!("\n\nPARSED IDENT = f\n{:?}", flg);
-        let f = FlagRule::parse(stream)?;
-        println!("{:?}", f);
-
-        let prms = Ident::parse(stream)?;
-        println!("\n\nPARSED IDENT = p\n{:?}", prms);
-        let p = ParameterRule::parse(stream)?;
-        println!("{:#?}", p);
-
-        Ok(Self::default())
+        Ok(rb)
     }
 }

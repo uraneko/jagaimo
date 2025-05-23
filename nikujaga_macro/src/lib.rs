@@ -11,6 +11,7 @@ use engine::RuleBook;
 pub fn nikujaga(input: TS) -> TS {
     // panic!("{:#?}", input);
     let rb: RuleBook = parse_macro_input!(input);
+    println!("{:#?}", rb);
 
     quote! {}.into()
 }
