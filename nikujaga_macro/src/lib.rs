@@ -7,6 +7,8 @@ use syn::parse_macro_input;
 mod engine;
 use engine::RuleBook;
 
+mod read_manifest;
+
 #[proc_macro]
 pub fn nikujaga(input: TS) -> TS {
     // panic!("{:#?}", input);

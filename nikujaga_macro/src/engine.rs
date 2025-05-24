@@ -19,29 +19,44 @@
 //! SYNTAX FLAGS:
 //! * LowerLong(scope(s), ...) => given scopes have to be in lowercase long format
 //! * LowerShort(scope(s), ...) => given scopes have to be in lowercase short format
-//! * AliasWhenPossble(scope(s), ...) => auto generate aliases for the given scope items when
+//! * AliasEager(scope(s), ...) => auto generate aliases for the given scope items when
 //! possible
 //! * Alias(scope(item) = alias) => manual alias, used in the form:
 //! Alias(r(collections) = colls)
-//! <- collections region can be aliased as colls  
+//! <- collections region can be aliased as colls, parser accepts both
 //! <- superseeds auto alias generation
-//! * KebabOnly(scope(s), ...) => only kebab (-) case is valid for the given scope(s) items
+//! Alias(r(collectibles) = colls)
+//! <- this rule would be ignored, superseeded by the above defined colls alias
+//! <- 2 aliases of the same value can not coexist, only the first one is accepted
+//! * AcceptSnake(scope(s), ...) => accept both snake and kebab (default) cases for given scopes
 //! * SnakeOnly(scope(s), ...) => only snake (_) case is valid for the given scope(s) items
 //!
 //! ATTRIBUTES:
-//! * no_help
-//! * no_version
-//! * fish_cmp
-//! * nu_cmp
+//! * no_help <- dont generate a help command
+//! * no_version <- dont generate a version command
+//! * fish_cmp <- generate completion for fish shell
+//! * nu_cmp <- generate completion for nu shell
+//! * branch_off_root
+//! <- top level scopes are branched out into their own cli tools
+//! i.e., if you have a cli tool called `ct` with 4 regions `a` `b` `c` and `d`
+//! thi attribute will generate code for 4 different cli tools `ct-a`, `ct-b`, `ct-c` and `ct-d`
+//! instead of generating code for a single cli tool;`ct`
+//! * root_name
+//! <- renames the resulting top level cli type, default is crate name
+//! follows the rust naming convetions
+//! * ignore_naming_conventions <- turns off rust naming convetions for cli top level type
+
 use proc_macro2::Span;
 use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream, Result as ParseResult};
-use syn::{Expr, Ident, Token, Type};
+use syn::{Ident, Lit, Token, Type};
 use syn::{braced, bracketed, parenthesized};
+
+use crate::read_manifest::read_manifest;
 
 #[derive(Debug, Default)]
 struct RegionsRule {
-    regions: Vec<Ident>,
+    regions: Vec<String>,
 }
 
 // rgns { [ bababa ] }
@@ -53,8 +68,8 @@ impl Parse for RegionsRule {
         let arr = content
             .parse_terminated(Ident::parse, Token![,])?
             .into_iter()
-            .map(|v| v)
-            .collect::<Vec<Ident>>();
+            .map(|v| v.to_string())
+            .collect::<Vec<String>>();
 
         Ok(Self { regions: arr })
     }
@@ -63,15 +78,15 @@ impl Parse for RegionsRule {
 #[derive(Debug)]
 enum Scope {
     Root,
-    Region(Ident),
-    RegionedOperation { region: Ident, op: Ident },
-    Operation(Ident),
+    Region(String),
+    RegionedOperation { region: String, op: String },
+    Operation(String),
 }
 
 #[derive(Debug)]
 struct OperationRule {
     scope: Scope,
-    ops: Vec<Ident>,
+    ops: Vec<String>,
 }
 
 impl Parse for OperationRule {
@@ -82,15 +97,15 @@ impl Parse for OperationRule {
         let scope = if scope.is_err() {
             Scope::Root
         } else {
-            Scope::Region(scope?)
+            Scope::Region(scope?.to_string())
         };
-        println!("{:?}", scope);
+
         let bracket = bracketed!(content in content);
         let arr = content
             .parse_terminated(Ident::parse, Token![,])?
             .into_iter()
-            .map(|v| v)
-            .collect::<Vec<Ident>>();
+            .map(|v| v.to_string())
+            .collect::<Vec<String>>();
 
         Ok(Self { scope, ops: arr })
     }
@@ -99,7 +114,7 @@ impl Parse for OperationRule {
 #[derive(Debug)]
 struct FlagRule {
     scope: Scope,
-    flags: Vec<Ident>,
+    flags: Vec<String>,
 }
 
 impl From<Vec<Ident>> for Scope {
@@ -109,14 +124,14 @@ impl From<Vec<Ident>> for Scope {
             2 => {
                 let item = value.pop().unwrap();
                 if value[0] == Ident::new("r", Span::call_site()) {
-                    Self::Region(item)
+                    Self::Region(item.to_string())
                 } else {
-                    Self::Operation(item)
+                    Self::Operation(item.to_string())
                 }
             }
             4 => Self::RegionedOperation {
-                region: value.remove(1),
-                op: value.pop().unwrap(),
+                region: value.remove(1).to_string(),
+                op: value.pop().unwrap().to_string(),
             },
             _ => panic!("scope cant take only: 0, 2 or 4 idents"),
         }
@@ -146,8 +161,8 @@ impl Parse for FlagRule {
         let arr = content
             .parse_terminated(Ident::parse, Token![,])?
             .into_iter()
-            .map(|v| v)
-            .collect::<Vec<Ident>>();
+            .map(|v| v.to_string())
+            .collect::<Vec<String>>();
 
         Ok(Self {
             scope: scope.into(),
@@ -219,25 +234,6 @@ enum Flags {
     UpperShort,
 }
 
-#[derive(Debug)]
-struct Attributes {
-    fish_cmp: bool,
-    nu_cmp: bool,
-    gen_help: bool,
-    gen_ver: bool,
-}
-
-impl Default for Attributes {
-    fn default() -> Self {
-        Self {
-            fish_cmp: true,
-            nu_cmp: true,
-            gen_help: true,
-            gen_ver: true,
-        }
-    }
-}
-
 #[derive(Debug, Default)]
 pub(crate) struct RuleBook {
     regions: RegionsRule,
@@ -269,15 +265,6 @@ impl RuleBook {
     }
 }
 
-// use std::sync::LazyLock;
-// const R: LazyLock<Ident> = LazyLock::new(|| Ident::new("r", Span::call_site()));
-// const O: LazyLock<Ident> = LazyLock::new(|| Ident::new("o", Span::call_site()));
-// const F: LazyLock<Ident> = LazyLock::new(|| Ident::new("f", Span::call_site()));
-// const P: LazyLock<Ident> = LazyLock::new(|| Ident::new("p", Span::call_site()));
-// const TR: LazyLock<Ident> = LazyLock::new(|| Ident::new("t.r", Span::call_site()));
-// const TF: LazyLock<Ident> = LazyLock::new(|| Ident::new("t.f", Span::call_site()));
-
-// TODO add support for random rules positioning
 impl Parse for RuleBook {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
         let mut rb = Self::default();
@@ -287,10 +274,138 @@ impl Parse for RuleBook {
                 "o" => rb.operation(OperationRule::parse(stream)?),
                 "f" => rb.flag(FlagRule::parse(stream)?),
                 "p" => rb.param(ParameterRule::parse(stream)?),
-                val => panic!("expected R, O, F, P, TR or TF; found {:?}", val),
+                val => panic!("expected one of r, o, f, p, tr or tf; found {:?}", val),
             }
         }
 
         Ok(rb)
+    }
+}
+
+#[derive(Debug)]
+struct Attributes {
+    fish_cmp: bool,
+    nu_cmp: bool,
+    gen_help: bool,
+    gen_ver: bool,
+    root_name: String,
+    ignore_naming_conventions: bool,
+    branch_off_root: bool,
+}
+
+impl Default for Attributes {
+    fn default() -> Self {
+        Self {
+            fish_cmp: true,
+            nu_cmp: true,
+            gen_help: true,
+            gen_ver: true,
+            ignore_naming_conventions: false,
+            branch_off_root: false,
+            root_name: "".into(),
+        }
+    }
+}
+
+impl Attributes {
+    fn new(name: String) -> Self {
+        Self {
+            root_name: name,
+            ..Self::default()
+        }
+    }
+}
+
+impl Parse for Attributes {
+    fn parse(stream: ParseStream) -> ParseResult<Self> {
+        let [name, _] = read_manifest();
+        let mut attrs = Attributes::new(name);
+
+        _ = <Token![#]>::parse(stream)?;
+        let content;
+        let bracket = bracketed!(content in stream);
+        // WARN doesnt work
+        // cus not all attrs are boolean
+        while content.peek(Ident::peek_any) {
+            match &Ident::parse(&content)?.to_string()[..] {
+                "root_name" => {
+                    _ = <Token![=]>::parse(&content)?;
+                    let name = Lit::parse(&content)?;
+                    let Lit::Str(ls) = name else {
+                        unreachable!("root_name attr has to take a single str lit")
+                    };
+
+                    attrs.root_name = ls.value();
+                }
+                "fish_cmp" => attrs.fish_cmp = true,
+                "nu_cmp" => attrs.nu_cmp = true,
+                "no_help" => attrs.gen_help = false,
+                "no_version" => attrs.gen_ver = false,
+                "ignore_naming_conventions" => attrs.ignore_naming_conventions = true,
+                _ => panic!("unrecognized fake attribute"),
+            }
+            if !content.is_empty() {
+                _ = <Token![,]>::parse(&content)?;
+            }
+        }
+
+        Ok(attrs)
+    }
+}
+
+#[derive(Debug)]
+enum CommandItem {
+    Region,
+    Operation,
+    Flag,
+    Parameter,
+}
+
+use crate::parser::LexToken;
+
+#[derive(Debug)]
+struct Item {
+    ty: std::mem::Discriminant<LexToken>,
+    name: String,
+    alias: Option<String>,
+}
+
+#[derive(Debug, Default)]
+enum CompoundingItem {
+    #[default]
+    Kebab,
+    Snake,
+    Both,
+}
+
+#[derive(Debug, Default)]
+enum CharsCase {
+    #[default]
+    LowerLong,
+    UpperShort,
+}
+
+#[derive(Debug, Default)]
+struct Syntax {
+    case: CharsCase,
+    bridge: CompoundingItem,
+    alias_eagerly: bool,
+    aliases: Vec<Item>,
+}
+
+impl Parse for Syntax {
+    fn parse(stream: ParseStream) -> ParseResult<Self> {
+        let mut syntax = Syntax::default();
+        let content;
+        let brace = braced!(content in stream);
+
+        while content.peek(Ident::peek_any) {
+            match Ident::parse(&content)?.to_string() {
+                "AliasEagerly" => 
+                "" => 
+                "" => 
+                "" => 
+            }
+        }
     }
 }

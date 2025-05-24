@@ -219,6 +219,25 @@ use nikujaga_macro::nikujaga;
 // }
 
 nikujaga! {
+    #[
+        no_help,
+        no_version,
+        branch_off_root,
+        nu_cmp,
+        fish_cmp,
+        root_name = "jagaimo",
+        ignore_naming_conventions
+    ]
+
+    syntax {
+        LowerLong(r, o),
+        AcceptSnake(*),
+        AliasEager(*),
+        Alias(o(add) = a),
+        Alias(r(remote) = rmt),
+    }
+
+
     r { [ collections, tags, history, algos ] }
     o { collections [ list, add, remove, edit, view ] }
     f { r(collections) o(list) [ max, query, tag ] }
