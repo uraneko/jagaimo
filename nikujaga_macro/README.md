@@ -1,1 +1,0 @@
-proc macro crate for the nikujaga cli utils lib

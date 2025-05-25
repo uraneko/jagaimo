@@ -1,4 +1,4 @@
-<h1>nikujaga</h1>
+<h1>jagaimo</h1>
 
 Cli arguments utilities library.
 

@@ -1,4 +1,4 @@
-use nikujaga_macro::nikujaga;
+use jagaimo_macro::jagaimo;
 
 // DOCS
 // given a cli command of unknown structure
@@ -46,7 +46,7 @@ use nikujaga_macro::nikujaga;
 // transform some tokens into other tokens
 // --base _ => --auto
 
-// Nikuajaga! {
+// jagaimo! {
 //     scopes: [],
 //     actions: [],
 // }
@@ -129,7 +129,7 @@ use nikujaga_macro::nikujaga;
 //
 // TODO: add support for auto gen of fish shell and nushell completions (completion.fish/nu files)
 // for the macro created cli tool
-// nikujaga! {
+// jagaimo! {
 //     semantics: Vec<Semantics>,
 //     values: Vec::from([
 //         meta: Semantics::OPS,
@@ -218,7 +218,7 @@ use nikujaga_macro::nikujaga;
 //     //
 // }
 
-nikujaga! {
+jagaimo! {
     #[
         no_help,
         no_version,
@@ -226,17 +226,18 @@ nikujaga! {
         nu_cmp,
         fish_cmp,
         root_name = "jagaimo",
-        ignore_naming_conventions
+        ignore_naming_conventions,
+        issue_tracker = "url/to/issue/tracker",
+        src_code = "url/to/source/code",
+        website = "url/to/website/",
     ]
 
+
     syntax {
-        LowerLong(r, o),
-        AcceptSnake(*),
-        AliasEager(*),
+        AliasEagerly,
         Alias(o(add) = a),
         Alias(r(remote) = rmt),
     }
-
 
     r { [ collections, tags, history, algos ] }
     o { collections [ list, add, remove, edit, view ] }
@@ -344,5 +345,5 @@ nikujaga! {
 // NOTE same as help
 // #[no_version]
 //
-// #[derive(nikujaga)]
+// #[derive(jagaimo)]
 // struct ExampleParser {}

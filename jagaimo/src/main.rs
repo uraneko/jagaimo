@@ -1,5 +1,5 @@
-use nikujaga::parsing::*;
-use nikujaga::parsing::{lex::Lex, parse::Parse};
+use jagaimo::parsing::*;
+use jagaimo::parsing::{lex::Lex, parse::Parse};
 
 fn main() {
     // "build --release --no-default-features --features \"nightly binary encoding_decoding\"";

@@ -3,14 +3,14 @@
 version = 4
 
 [[package]]
-name = "nikujaga"
+name = "jagaimo"
 version = "0.1.0"
 dependencies = [
- "nikujaga_macro",
+ "jagaimo_macro",
 ]
 
 [[package]]
-name = "nikujaga_macro"
+name = "jagaimo_macro"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
 members = [
-	"nikujaga",
-	"nikujaga_macro",
+	"jagaimo",
+	"jagaimo_macro",
 ]

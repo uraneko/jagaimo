@@ -5,15 +5,17 @@ use quote::quote;
 use syn::parse_macro_input;
 
 mod engine;
-use engine::RuleBook;
+use engine::{CommandTree, Unprocessed};
 
 mod read_manifest;
 
+mod parser;
+
 #[proc_macro]
-pub fn nikujaga(input: TS) -> TS {
+pub fn jagaimo(input: TS) -> TS {
     // panic!("{:#?}", input);
-    let rb: RuleBook = parse_macro_input!(input);
-    println!("{:#?}", rb);
+    let ct: CommandTree<Unprocessed> = parse_macro_input!(input);
+    println!("{:#?}", ct);
 
     quote! {}.into()
 }

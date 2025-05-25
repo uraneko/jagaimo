@@ -52,7 +52,8 @@ use syn::parse::{Parse, ParseStream, Result as ParseResult};
 use syn::{Ident, Lit, Token, Type};
 use syn::{braced, bracketed, parenthesized};
 
-use crate::read_manifest::read_manifest;
+use crate::parser::Token;
+use crate::read_manifest::ManifestReader;
 
 #[derive(Debug, Default)]
 struct RegionsRule {
@@ -208,7 +209,7 @@ impl Parse for ParameterRule {
 
 // NOTE this needs the Token type to be written first
 // which means this has to waut for the parser module
-// since Token (nikujaga's parser's token, not syn's) is part of parser::lex
+// since Token (jagaimo's parser's token, not syn's) is part of parser::lex
 #[derive(Debug)]
 struct TransformRule {
     src: Pattern,
@@ -274,6 +275,7 @@ impl Parse for RuleBook {
                 "o" => rb.operation(OperationRule::parse(stream)?),
                 "f" => rb.flag(FlagRule::parse(stream)?),
                 "p" => rb.param(ParameterRule::parse(stream)?),
+                "tr" | "tf" => unimplemented!(),
                 val => panic!("expected one of r, o, f, p, tr or tf; found {:?}", val),
             }
         }
@@ -291,6 +293,9 @@ struct Attributes {
     root_name: String,
     ignore_naming_conventions: bool,
     branch_off_root: bool,
+    issue_tracker: Option<String>,
+    src_code: Option<String>,
+    website: Option<String>,
 }
 
 impl Default for Attributes {
@@ -303,6 +308,9 @@ impl Default for Attributes {
             ignore_naming_conventions: false,
             branch_off_root: false,
             root_name: "".into(),
+            issue_tracker: None,
+            src_code: None,
+            website: None,
         }
     }
 }
@@ -318,7 +326,7 @@ impl Attributes {
 
 impl Parse for Attributes {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
-        let [name, _] = read_manifest();
+        let name = ManifestReader::crate_name();
         let mut attrs = Attributes::new(name);
 
         _ = <Token![#]>::parse(stream)?;
@@ -328,6 +336,14 @@ impl Parse for Attributes {
         // cus not all attrs are boolean
         while content.peek(Ident::peek_any) {
             match &Ident::parse(&content)?.to_string()[..] {
+                // "fish_cmp"
+                // | "nu_cmp"
+                // | "ignore_naming_conventions"
+                // | "no_help"
+                // | "no_version"
+                // | "issue_tracker"
+                // | "src_code"
+                // | "website" => unimplemented!(),
                 "root_name" => {
                     _ = <Token![=]>::parse(&content)?;
                     let name = Lit::parse(&content)?;
@@ -341,8 +357,36 @@ impl Parse for Attributes {
                 "nu_cmp" => attrs.nu_cmp = true,
                 "no_help" => attrs.gen_help = false,
                 "no_version" => attrs.gen_ver = false,
+                "branch_off_root" => attrs.branch_off_root = true,
                 "ignore_naming_conventions" => attrs.ignore_naming_conventions = true,
-                _ => panic!("unrecognized fake attribute"),
+                "issue_tracker" => {
+                    _ = <Token![=]>::parse(&content)?;
+                    let value = Lit::parse(&content)?;
+                    let Lit::Str(ls) = value else {
+                        unreachable!("issue_tracker attr has to take a single str lit")
+                    };
+
+                    attrs.issue_tracker = Some(ls.value());
+                }
+                "src_code" => {
+                    _ = <Token![=]>::parse(&content)?;
+                    let value = Lit::parse(&content)?;
+                    let Lit::Str(ls) = value else {
+                        unreachable!("src_code attr has to take a single str lit")
+                    };
+
+                    attrs.src_code = Some(ls.value());
+                }
+                "website" => {
+                    _ = <Token![=]>::parse(&content)?;
+                    let value = Lit::parse(&content)?;
+                    let Lit::Str(ls) = value else {
+                        unreachable!("website attr has to take a single str lit")
+                    };
+
+                    attrs.website = Some(ls.value());
+                }
+                val => panic!("unrecognized fake attribute {}", val),
             }
             if !content.is_empty() {
                 _ = <Token![,]>::parse(&content)?;
@@ -353,59 +397,136 @@ impl Parse for Attributes {
     }
 }
 
-#[derive(Debug)]
-enum CommandItem {
-    Region,
-    Operation,
-    Flag,
-    Parameter,
-}
-
-use crate::parser::LexToken;
-
-#[derive(Debug)]
-struct Item {
-    ty: std::mem::Discriminant<LexToken>,
-    name: String,
-    alias: Option<String>,
-}
-
-#[derive(Debug, Default)]
-enum CompoundingItem {
+#[derive(Debug, Default, PartialEq)]
+enum Case {
+    Snake,
     #[default]
     Kebab,
-    Snake,
     Both,
 }
 
 #[derive(Debug, Default)]
-enum CharsCase {
-    #[default]
-    LowerLong,
-    UpperShort,
+struct Syntax {
+    case: Case,
+    alias_eagerly: bool,
+    aliases: Vec<Alias>,
 }
 
-#[derive(Debug, Default)]
-struct Syntax {
-    case: CharsCase,
-    bridge: CompoundingItem,
-    alias_eagerly: bool,
-    aliases: Vec<Item>,
+#[derive(Debug)]
+struct Alias {
+    token: Token,
+    alias: String,
 }
 
 impl Parse for Syntax {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
         let mut syntax = Syntax::default();
+        // parse the syntax ident
+        _ = Ident::parse(stream)?;
         let content;
         let brace = braced!(content in stream);
 
+        let mut temp;
+        let mut subtemp;
         while content.peek(Ident::peek_any) {
-            match Ident::parse(&content)?.to_string() {
-                "AliasEagerly" => 
-                "" => 
-                "" => 
-                "" => 
+            match Ident::parse(&content)?.to_string().as_str() {
+                "AliasEagerly" => syntax.alias_eagerly = true,
+                "SnakeOnly" => {
+                    if syntax.case != Case::Both {
+                        syntax.case = Case::Snake
+                    }
+                }
+                "AllowSnakeCase" => syntax.case = Case::Both,
+                "Alias" => {
+                    _ = parenthesized!(temp in content);
+                    let scope = Ident::parse(&temp)?;
+                    _ = parenthesized!(subtemp in temp);
+                    let origin = Ident::parse(&subtemp)?;
+                    _ = <Token![=]>::parse(&temp)?;
+                    let alias = Ident::parse(&temp)?;
+
+                    syntax.aliases.push([scope, origin, alias].into());
+                }
+                val => unimplemented!("unemplemented syntax rule {}", val),
+            }
+
+            if !content.is_empty() {
+                _ = <Token![,]>::parse(&content)?;
             }
         }
+
+        Ok(syntax)
+    }
+}
+
+impl From<[Ident; 2]> for Token {
+    fn from(value: [Ident; 2]) -> Self {
+        let val = value[1].to_string();
+        match value[0].to_string().as_str() {
+            "r" => Token::Region(val),
+            "o" => Token::Operation(val),
+            // WARN this cant generate all flag tokens properly
+            // since parameterized flag tokens contain their params data and
+            // this doesnt have access to those params, which are runtime values
+            // NOTE then again, the alias itself has no use for the params
+            // it functions correctly without that info
+            // the only problem is that Token::Flag is a boolean flag
+            // which is a misrepresentation for parameterized flags
+            "f" => Token::Flag(val),
+            _ => panic!("aliases can only be made for region (r), operation (o) or a flag (f)"),
+        }
+    }
+}
+
+impl From<[Ident; 3]> for Alias {
+    fn from(mut value: [Ident; 3]) -> Self {
+        use std::mem::{swap, zeroed};
+
+        let [mut a, mut b, mut c] = unsafe { [zeroed(), zeroed(), zeroed()] };
+
+        swap(&mut a, &mut value[0]);
+        swap(&mut b, &mut value[1]);
+        swap(&mut c, &mut value[2]);
+
+        Self {
+            token: [a, b].into(),
+            alias: c.to_string(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct Unprocessed;
+
+#[derive(Debug)]
+pub(crate) struct CommandTree<Unprocessed> {
+    attrs: Attributes,
+    rules: RuleBook,
+    syntax: Syntax,
+    _data: std::marker::PhantomData<Unprocessed>,
+}
+
+impl Parse for CommandTree<Unprocessed> {
+    fn parse(stream: ParseStream) -> ParseResult<Self> {
+        let (mut attrs, mut rules, mut syntax) =
+            (Default::default(), Default::default(), Default::default());
+        while !stream.is_empty() {
+            if stream.peek(Token![#]) {
+                attrs = Attributes::parse(stream)?;
+            } else if stream.peek(Ident::peek_any) {
+                if stream.fork().parse::<Ident>()?.to_string().as_str() == "syntax" {
+                    syntax = Syntax::parse(stream)?;
+                } else {
+                    rules = RuleBook::parse(stream)?;
+                }
+            }
+        }
+
+        Ok(Self {
+            attrs,
+            syntax,
+            rules,
+            _data: std::marker::PhantomData,
+        })
     }
 }
