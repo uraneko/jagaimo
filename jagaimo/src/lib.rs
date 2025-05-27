@@ -80,7 +80,7 @@ use jagaimo_macro::jagaimo;
 // }
 // this allows parsing of git remote add ... commands
 // but not any other git remote <operation> ... commands
-// nor any other git <region> ... commands
+// nor any other git <realm> ... commands
 
 /// Description can be either
 /// inline: inside every item of the macro struct
@@ -90,17 +90,17 @@ use jagaimo_macro::jagaimo;
 /// the macro is not a real struct,
 /// you only need pass it what your cli needs
 ///
-/// if your cli commands dont use regions
-/// then skip the regions field
+/// if your cli commands dont use realms
+/// then skip the realms field
 ///
 /// likewise for operations
 ///
 /// you can use the macro rules to specify:
 /// * allowed sub scopes of a scope
-/// -> ops { !region [add, remove, view] }
-/// <- no region, cli operations are add, remove and view,
+/// -> ops { !realm [add, remove, view] }
+/// <- no realm, cli operations are add, remove and view,
 /// <- it is a compiler/expand error not to specify the rules necessary for the defined ops
-/// you can do the same to specify regions or flags
+/// you can do the same to specify realms or flags
 /// * allowed parameter type for a scope
 /// -> params { operation(add) [String, u32] }
 /// <- all add operations under any scope can only take either a String or a u32
@@ -111,7 +111,7 @@ use jagaimo_macro::jagaimo;
 // HOWTO:
 // * define all the possible rules
 // * define all the possible flags (AliasWhenPossible is a flag), flags apply to rule types
-// (r.g., a flag for regions rule)
+// (r.g., a flag for realms rule)
 // * define all the possible attributes (#[no_help] is an attribute), attrs apply to the macro
 // * define the valid syntax of all the rules, flags and attributes
 // * parse all the rules, flags and attrs into their asts
@@ -136,7 +136,7 @@ use jagaimo_macro::jagaimo;
 //         functional: Semantics::BARE
 //     ]),
 //
-//     regions: Regions {
+//     realms: Realms {
 //         syntax: Syntax,
 //         values: Vec<String>,
 //
@@ -156,10 +156,10 @@ use jagaimo_macro::jagaimo;
 //     // both would be valid
 //     // vec![
 //     //  { collections [list, add, remove, edit, view] }
-//     //  same as { region(collections) [list, add, remove, edit, view] }
-//     //  <- operations of the collections region
+//     //  same as { realm(collections) [list, add, remove, edit, view] }
+//     //  <- operations of the collections realm
 //     //  { [reset, reload, meta, version <- version is auto added here ] }
-//     //  same as { !region [reset, reload, meta, version ] }
+//     //  same as { !realm [reset, reload, meta, version ] }
 //     //  <- operations that apply directly to cli tool
 //     //  ...
 //     // ]
@@ -190,11 +190,11 @@ use jagaimo_macro::jagaimo;
 //     // NoDirectParams <- turns off scope params = all params must come from a flag
 //     // vec![
 //     //  { operation(add) [String] },
-//     //  all add operations no matter what region (including !region) they are called on
+//     //  all add operations no matter what realm (including !realm) they are called on
 //     //  can only take a single string parameter
-//     //  * this is valid:     cli region add "my string value"
+//     //  * this is valid:     cli realm add "my string value"
 //     //  * also valid:        cli add "my string value"
-//     //  * this is not valid: cli region add 765
+//     //  * this is not valid: cli realm add 765
 //     //  * also not valid:    cli add "some str" "and then" "another"
 //     //  { ! [u8, String, String+u8] },
 //     //  this makes this valid:      cli "str"
@@ -202,7 +202,7 @@ use jagaimo_macro::jagaimo;
 //     //  while this is invalid:      cli 434 <- 434 > u8::MAX
 //     //  this is also valid:         cli 123 "string" <- due to the last rule String+u8
 //     //  params are interchangeable: cli "string" 123
-//     //  { region(collections) operation(add) Flag(source) [Vec<String>, Path] },
+//     //  { realm(collections) operation(add) Flag(source) [Vec<String>, Path] },
 //     //  rule for the same operation add that is defined above for all uses
 //     //  this smaller scoped rule takes precedence over the more general rule
 //     //  so this:  cli collections add "this" "and that" <- is valid
@@ -227,9 +227,7 @@ jagaimo! {
         fish_cmp,
         root_name = "jagaimo",
         ignore_naming_conventions,
-        issue_tracker = "url/to/issue/tracker",
-        src_code = "url/to/source/code",
-        website = "url/to/website/",
+        disable_derives(Debug, Clone)
     ]
 
 
@@ -239,10 +237,18 @@ jagaimo! {
         Alias(r(remote) = rmt),
     }
 
+    // the cli tool has 4 realms (sub-commands)
     r { [ collections, tags, history, algos ] }
+    // the collections realm can take one of the following 5 operations
     o { collections [ list, add, remove, edit, view ] }
-    f { r(collections) o(list) [ max, query, tag ] }
+    // this is a rule detailing flags with params
+    f { r(collections) o(list) [ max(u8), tagged, query((String, Vec<i32>)), tag(char), verbose ] }
+    // this rule describes direct caller params, but the context could still contain flags
     p { r(history) o(view) [ u8, (String, bool), (String, Vec<i32>, char) ] }
+    f { r(collections) [ showcase(u8), dashboard(String) ] }
+    p { r(history) [ i32, HashMap<String, u8> ] }
+
+    o { history [ show, clean, reset ] }
 }
 
 // add trait Command {
@@ -252,18 +258,18 @@ jagaimo! {
 // help and version could have default impls that are used when auto gen is turned off
 // }
 
-// DOCS core concepts are regions, operations, flags and parameters
+// DOCS core concepts are realms, operations, flags and parameters
 // definition of a cli tool
 //
 // semantic representation
 // a single cli tool commands can be either:
-// cli region operation flags parameters
+// cli realm operation flags parameters
 // cli operation flags parameters
 // cli flags parameters
 // a cli tool may make use of more than one of these
 //
 // syntatic representation
-// given a hypothetical region 'external-databases, it can be written as:
+// given a hypothetical realm 'external-databases, it can be written as:
 // Syntax{ Capital, Kebab } External-databases
 // Syntax{ Title, Kebab } External-Databases
 // Syntax{ Capital, Snake } External_databases
@@ -344,6 +350,3 @@ jagaimo! {
 // dont auto generate a version command
 // NOTE same as help
 // #[no_version]
-//
-// #[derive(jagaimo)]
-// struct ExampleParser {}

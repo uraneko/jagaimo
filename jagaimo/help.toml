@@ -1,11 +1,25 @@
-[regions]
+[main]
+description = "brief description of the cli tool"
+
+[links]
+issue_tracker = ""
+src_code = ""
+website = ""
+
+[links.extra]
+cli_specific_link = ""
+
+[realms]
 collections = "operations for managing collections"
 
 [operations]
 add = "create a new item and add it to existing group"
-# this superseed the above general description for the add ope when the region is collections 
-collections:add = "add a new collection to the database"
+# this superseed the above general description for the add ope when the realm is collections 
+collections.add = "add a new collection to the collections database"
 
 [flags]
-# the syntax <r|o> means replace itself with the region name, and if there is no region for that flag's scope then with operation name
+# the syntax <r|o> means replace itself with the realm name, 
+# and if there is no realm for that flag's scope then with operation name
 size = "specify the size of the <r|o> "
+# this specific rule supersedes any other limit flag rule for command history query --limit
+history.query.limit = "sets the limit of the history query results count"

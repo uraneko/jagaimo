@@ -4,18 +4,31 @@ use quote::ToTokens;
 use quote::quote;
 use syn::parse_macro_input;
 
+// DOCS
+//               command
+//  _____________________________________
+// |                                     |
+// executable realm operation flags params
+// |                        | |          |
+// ---------------------------------------
+//           call              context
+
 mod engine;
-use engine::{CommandTree, Unprocessed};
+mod resolve_crate;
+mod traits;
 
-mod read_manifest;
-
-mod parser;
+use engine::{CommandTree, RuleBook};
 
 #[proc_macro]
 pub fn jagaimo(input: TS) -> TS {
     // panic!("{:#?}", input);
-    let ct: CommandTree<Unprocessed> = parse_macro_input!(input);
+    let ct: CommandTree = parse_macro_input!(input);
     println!("{:#?}", ct);
+    let rb = ct.rules();
+    let realms = rb.generate_realms();
 
-    quote! {}.into()
+    quote! {
+        #(#realms)*
+    }
+    .into()
 }
