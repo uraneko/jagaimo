@@ -14,7 +14,7 @@ pub struct Help {
     main: Main,
     links: Links,
     tokens: HashMap<Token, String>,
-    realms: Realms,
+    spaces: Spaces,
     operations: Operations,
     flags: Flags,
 }
@@ -30,7 +30,7 @@ struct Main {
     decription: Option<String>,
 }
 
-struct Realms {}
+struct Spaces {}
 
 struct Operations {}
 

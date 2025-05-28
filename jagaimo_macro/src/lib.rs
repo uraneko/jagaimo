@@ -5,13 +5,13 @@ use quote::quote;
 use syn::parse_macro_input;
 
 // DOCS
-//               command
+//                  command
 //  _____________________________________
 // |                                     |
-// executable realm operation flags params
+// executable space operation flags params
 // |                        | |          |
 // ---------------------------------------
-//           call              context
+//             scope            context
 
 mod engine;
 mod resolve_crate;
@@ -23,12 +23,11 @@ use engine::{CommandTree, RuleBook};
 pub fn jagaimo(input: TS) -> TS {
     // panic!("{:#?}", input);
     let ct: CommandTree = parse_macro_input!(input);
-    println!("{:#?}", ct);
+    // println!("{:#?}", ct);
     let rb = ct.rules();
-    let realms = rb.generate_realms();
-
-    quote! {
-        #(#realms)*
+    for c in rb.commands() {
+        println!("{}", c);
     }
-    .into()
+
+    quote! {}.into()
 }

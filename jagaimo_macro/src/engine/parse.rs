@@ -3,7 +3,7 @@
 //! so to say, the macro's direct input is the RuleBook struct
 //!
 //! RULES TYPES:
-//! * r(egions) => defines all the realms of the root scope, if any,
+//! * r(egions) => defines all the spaces of the root scope, if any,
 //! passing more than 1 such rule to the macro will trigger a panic
 //! * o(peration) => defines the posiible operations of a scope
 //! * f(lag) => defines the possible flags of a scope
@@ -23,7 +23,7 @@
 //! possible
 //! * Alias(scope(item) = alias) => manual alias, used in the form:
 //! Alias(r(collections) = colls)
-//! <- collections realm can be aliased as colls, parser accepts both
+//! <- collections space can be aliased as colls, parser accepts both
 //! <- superseeds auto alias generation
 //! Alias(r(collectibles) = colls)
 //! <- this rule would be ignored, superseeded by the above defined colls alias
@@ -38,7 +38,7 @@
 //! * nu_cmp <- generate completion for nu shell
 //! * branch_off_root
 //! <- top level scopes are branched out into their own cli tools
-//! i.e., if you have a cli tool called `ct` with 4 realms `a` `b` `c` and `d`
+//! i.e., if you have a cli tool called `ct` with 4 spaces `a` `b` `c` and `d`
 //! thi attribute will generate code for 4 different cli tools `ct-a`, `ct-b`, `ct-c` and `ct-d`
 //! instead of generating code for a single cli tool;`ct`
 //! * root_name
@@ -46,183 +46,65 @@
 //! follows the rust naming convetions
 //! * ignore_naming_conventions <- turns off rust naming convetions for cli top level type
 
-use super::IdentExt;
-use super::Span;
-use super::{Ident, Lit, Token, Type};
-use super::{Parse, ParseResult, ParseStream};
-use super::{braced, bracketed, parenthesized};
-use super::{discriminant, dummy_ident};
+use proc_macro2::Span;
+use syn::ext::IdentExt;
+use syn::parse::{Parse, ParseStream, Result as ParseResult};
+use syn::{Ident, Lit, token::Bracket};
+use syn::{braced, bracketed, parenthesized};
 
+use std::mem::discriminant;
+
+use super::Token;
+use super::dummy_ident;
 use crate::resolve_crate::ResolveCrate;
 use crate::traits::Token;
 
+pub mod commands;
+pub mod context;
 pub mod flags;
-pub mod operations;
-pub mod parameters;
-pub mod realms;
+pub mod scope;
 pub mod transforms;
 
-pub use flags::FlagsRule;
-pub use operations::OperationsRule;
-pub use parameters::ParamsRule;
-pub use realms::RealmsRule;
-pub use transforms::TransformsRule;
+pub use commands::{CommandRule, ExpandedCommandRule};
+pub use transforms::TransformRule;
 
-#[derive(Debug, Default, PartialEq)]
-pub enum Scope {
-    #[default]
-    Executable,
-    Realm(Ident),
-    RealmOperation {
-        realm: Ident,
-        op: Ident,
-    },
-    Operation(Ident),
-}
-
-impl Scope {
-    // returns option of the ident of realm only if self is of the realm variant
-    // otherwise returns None
-    pub fn realm(&self) -> Option<&Ident> {
-        let Scope::Realm(i) = self else {
-            return None;
-        };
-
-        Some(i)
+pub fn extract_scope_items(s: ParseStream) -> ParseResult<Vec<Ident>> {
+    if s.peek(Bracket) {
+        return Ok(vec![]);
     }
+    let i = Ident::parse(&s)?;
 
-    pub fn realm_op(&self) -> Option<[&Ident; 2]> {
-        let Scope::RealmOperation { realm, op } = self else {
-            return None;
-        };
-
-        Some([realm, op])
-    }
-
-    pub fn op(&self) -> Option<&Ident> {
-        let Scope::Operation(i) = self else {
-            return None;
-        };
-
-        Some(i)
-    }
-
-    pub fn is_escutable(&self) -> bool {
-        self == &Scope::Executable
-    }
-
-    pub fn is_realm(&self) -> bool {
-        discriminant(self) == discriminant(&Self::Realm(dummy_ident()))
-    }
-
-    pub fn is_realm_op(&self) -> bool {
-        discriminant(self)
-            == discriminant(&Self::RealmOperation {
-                realm: dummy_ident(),
-                op: dummy_ident(),
-            })
-    }
-
-    pub fn is_op(&self) -> bool {
-        discriminant(self) == discriminant(&Self::Operation(dummy_ident()))
-    }
-
-    pub fn matches_realm(&self, r: &Ident) -> bool {
-        if let Some(realm) = self.realm() {
-            return realm == r;
-        }
-
-        false
-    }
-
-    pub fn matches_realm_op(&self, ro: &[&Ident; 2]) -> bool {
-        if let Some([r, o]) = self.realm_op() {
-            return r == ro[0] && o == ro[1];
-        }
-
-        false
-    }
-
-    pub fn matches_op(&self, o: &Ident) -> bool {
-        if let Some(op) = self.op() {
-            return op == o;
-        }
-
-        false
-    }
-}
-
-impl From<Vec<Ident>> for Scope {
-    fn from(mut value: Vec<Ident>) -> Self {
-        match value.len() {
-            0 => Self::Executable,
-            2 => {
-                let item = value.pop().unwrap();
-                if value[0] == Ident::new("r", Span::call_site()) {
-                    Self::Realm(item)
-                } else {
-                    Self::Operation(item)
-                }
-            }
-            4 => Self::RealmOperation {
-                realm: value.remove(1),
-                op: value.pop().unwrap(),
-            },
-            _ => panic!("scope cant take only: 0, 2 or 4 idents"),
-        }
-    }
+    let scopes;
+    _ = parenthesized!(scopes in s);
+    // use punctuated instead
+    scopes
+        .parse_terminated(Ident::parse, Token![,])
+        .map(|p| p.into_iter().collect())
 }
 
 #[derive(Debug, Default)]
 pub struct RuleBook {
-    realms: RealmsRule,
-    opes: Vec<OperationsRule>,
-    flags: Vec<FlagsRule>,
-    params: Vec<ParamsRule>,
-    transforms: Vec<TransformsRule>,
+    commands: Vec<CommandRule>,
+    transforms: Vec<TransformRule>,
 }
 
 impl RuleBook {
-    pub fn realms(&self) -> &RealmsRule {
-        &self.realms
+    fn push_commands(&mut self, commands: ExpandedCommandRule) {
+        self.commands.extend(commands.into_rules());
     }
 
-    pub fn realms_vec(&self) -> &[Ident] {
-        &self.realms.realms()
-    }
-
-    pub fn ops(&self) -> &[OperationsRule] {
-        &self.opes
-    }
-
-    pub fn flags(&self) -> &[FlagsRule] {
-        &self.flags
-    }
-
-    pub fn params(&self) -> &[ParamsRule] {
-        &self.params
-    }
-}
-
-impl RuleBook {
-    fn set_realms(&mut self, r: RealmsRule) {
-        self.realms = r;
-    }
-
-    fn push_operation(&mut self, ope: OperationsRule) {
-        self.opes.push(ope);
-    }
-
-    fn push_flag(&mut self, f: FlagsRule) {
-        self.flags.push(f);
-    }
-
-    fn push_param(&mut self, p: ParamsRule) {
-        self.params.push(p);
-    }
-
-    fn push_transform(&mut self, t: TransformsRule) {
+    fn push_transform(&mut self, t: TransformRule) {
         self.transforms.push(t);
+    }
+}
+
+impl RuleBook {
+    pub fn commands(&self) -> &[CommandRule] {
+        &self.commands
+    }
+
+    pub fn transforms(&self) -> &[TransformRule] {
+        &self.transforms
     }
 }
 
@@ -231,12 +113,9 @@ impl Parse for RuleBook {
         let mut rb = Self::default();
         while stream.peek(Ident::peek_any) {
             match &Ident::parse(stream)?.to_string()[..] {
-                "r" => rb.set_realms(RealmsRule::parse(stream)?),
-                "o" => rb.push_operation(OperationsRule::parse(stream)?),
-                "f" => rb.push_flag(FlagsRule::parse(stream)?),
-                "p" => rb.push_param(ParamsRule::parse(stream)?),
-                "tr" | "tf" => unimplemented!(),
-                val => panic!("expected one of r, o, f, p, tr or tf; found {:?}", val),
+                "t" => unimplemented!(),
+                "c" => rb.push_commands(ExpandedCommandRule::parse(stream)?),
+                val => panic!("expected c or t found {:?}", val),
             }
         }
 
@@ -291,6 +170,7 @@ impl Attributes {
         ]
     }
 }
+
 impl Parse for Attributes {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
         let name = ResolveCrate::new().read_manifest().crate_name();
@@ -412,7 +292,7 @@ impl From<[Ident; 2]> for Token {
     fn from(value: [Ident; 2]) -> Self {
         let val = value[1].to_string();
         match value[0].to_string().as_str() {
-            "r" => Token::Realm(val),
+            "r" => Token::Space(val),
             "o" => Token::Operation(val),
             // WARN this cant generate all flag tokens properly
             // since parameterized flag tokens contain their params data and
@@ -422,7 +302,7 @@ impl From<[Ident; 2]> for Token {
             // the only problem is that Token::Flag is a boolean flag
             // which is a misrepresentation for parameterized flags
             "f" => Token::Flag(val),
-            _ => panic!("aliases can only be made for realm (r), operation (o) or a flag (f)"),
+            _ => panic!("aliases can only be made for space (r), operation (o) or a flag (f)"),
         }
     }
 }

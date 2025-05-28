@@ -1,20 +1,33 @@
-use super::{
-    Ident, IdentExt, Parse, ParseResult, ParseStream, Scope, Token, Type, braced, bracketed,
+use proc_macro2::TokenStream as TS2;
+use quote::quote;
+use syn::Variant;
+use syn::parse_str;
+use syn::token::Paren;
+use syn::{
+    Ident, Token, Type, braced, bracketed,
+    ext::IdentExt,
     parenthesized,
+    parse::{Parse, ParseStream, Result as ParseResult},
 };
+
+use quote::ToTokens;
+
+use super::scope::Scope;
 use crate::engine::{discriminant, dummy_ident, dummy_type};
 
-#[derive(Debug)]
-pub struct FlagsRule {
-    scope: Scope,
-    flags: Vec<Flag>,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Flag {
     Bool(Ident),
     Parameterized(Ident, Type),
-    Params(Ident, Vec<Type>),
+}
+
+impl Flag {
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Bool(i) => i.to_string(),
+            Self::Parameterized(i, t) => format!("{}({:?})", i, t.to_token_stream().to_string()),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -29,17 +42,13 @@ impl Parse for Flag {
             return Ok(Self::Bool(ident));
         }
 
-        let content;
-        _ = parenthesized!(content in s);
-        let mut tys = content
-            .parse_terminated(Type::parse, Token![,])?
-            .into_iter()
-            .collect::<Vec<Type>>();
-        Ok(match tys.len() {
-            0 => Self::Bool(ident),
-            1 => Self::Parameterized(ident, tys.pop().unwrap()),
-            _ => Self::Params(ident, tys),
-        })
+        if s.peek(Paren) {
+            let content;
+            _ = parenthesized!(content in s);
+            let mut ty = Type::parse(&content)?;
+            return Ok(Self::Parameterized(ident, ty));
+        }
+        Ok(Self::Bool(ident))
     }
 }
 
@@ -74,45 +83,6 @@ impl Parse for FlagsVec {
     }
 }
 
-impl Parse for FlagsRule {
-    fn parse(stream: ParseStream) -> ParseResult<Self> {
-        let mut content;
-        let brace = braced!(content in stream);
-
-        let mut idents: Vec<Ident> = vec![];
-        let mut scope = vec![];
-        let mut temp;
-        loop {
-            if content.peek(Ident::peek_any) {
-                scope.extend([Ident::parse(&content)?, {
-                    let _paren = parenthesized!(temp in content);
-
-                    Ident::parse(&temp)?
-                }]);
-            } else {
-                break;
-            }
-        }
-        let bracket = bracketed!(content in content);
-        let arr = FlagsVec::parse(&content)?.flags;
-
-        Ok(Self {
-            scope: scope.into(),
-            flags: arr,
-        })
-    }
-}
-
-impl FlagsRule {
-    pub fn scope(&self) -> &Scope {
-        &self.scope
-    }
-
-    pub fn flags(&self) -> &[Flag] {
-        &self.flags
-    }
-}
-
 impl Flag {
     pub fn is_bool(&self) -> bool {
         discriminant(self) == discriminant(&Self::Bool(dummy_ident()))
@@ -122,7 +92,10 @@ impl Flag {
         discriminant(self) == discriminant(&Self::Parameterized(dummy_ident(), dummy_type()))
     }
 
-    pub fn is_params(&self) -> bool {
-        discriminant(self) == discriminant(&Self::Params(dummy_ident(), vec![]))
+    pub fn to_field(&self) -> [TS2; 2] {
+        match self {
+            Self::Bool(i) => [quote! { #i: bool }, quote! {}],
+            Self::Parameterized(i, t) => [quote! { #i: #t }, quote! {}],
+        }
     }
 }

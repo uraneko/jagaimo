@@ -1,9 +1,9 @@
 use super::{Parse, ParseResult, ParseStream};
 
 #[derive(Debug)]
-pub struct TransformsRule {}
+pub struct TransformRule {}
 
-impl Parse for TransformsRule {
+impl Parse for TransformRule {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
         todo!()
     }

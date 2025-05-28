@@ -4,8 +4,8 @@ use std::env::{Args, args};
 pub enum Token {
     // fs path of the command root; the executable being run
     ExecutablePath(String),
-    // realm name
-    Realm(String),
+    // space name
+    Space(String),
     // operation name
     Operation(String),
     // flag name; bool flag, takes no paarams
@@ -30,7 +30,7 @@ pub enum Token {
 // <- should come first, but cant since it needs validations
 // 7/ return tokens
 //
-// 1/ check if 1st is realm or operation
+// 1/ check if 1st is space or operation
 
 // the follwing 2 types should be under the engine::process module
 use std::collections::HashMap;
@@ -44,7 +44,7 @@ use syn::Type;
 // finally match on the input args and every command's token extraction logic
 
 pub struct Caller {
-    realm: Option<String>,
+    space: Option<String>,
     operation: Option<String>,
 }
 
@@ -66,7 +66,7 @@ where
     const GRAPH: [Vec<Token>; GS];
     // HashMap<Caller, Params>;
 
-    fn has_realms() -> bool {
+    fn has_spaces() -> bool {
         !Self::REGIONS.is_empty()
     }
 
@@ -78,7 +78,7 @@ where
         !Self::FLAGS.is_empty()
     }
 
-    fn is_realm(s: &str) -> bool {
+    fn is_space(s: &str) -> bool {
         Self::REGIONS.contains(&s)
     }
 
@@ -94,13 +94,13 @@ where
         args()
     }
 
-    fn parse_realm(v: &mut Vec<Token>, next: String) -> Option<String> {
-        if !Self::has_realms() {
+    fn parse_space(v: &mut Vec<Token>, next: String) -> Option<String> {
+        if !Self::has_spaces() {
             return None;
         }
 
-        if Self::is_realm(&next) {
-            v.push(Token::Realm(next));
+        if Self::is_space(&next) {
+            v.push(Token::Space(next));
             return None;
         }
 
@@ -137,10 +137,10 @@ where
     }
 
     // validates the command against the known callers
-    // root realm ... <- is a caller
+    // root space ... <- is a caller
     // root ... <- is a caller
-    // root realm operation ... <- is a caller too
-    // caller is root realm and operation,, whichever of them exists is part of caller
+    // root space operation ... <- is a caller too
+    // caller is root space and operation,, whichever of them exists is part of caller
     // if the given caller is not found in the command graph then we error out
     fn validate_callers();
 

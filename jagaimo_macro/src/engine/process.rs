@@ -8,13 +8,11 @@ use syn::{Ident, Type, Variant};
 
 use super::parse::Case;
 
-use super::parse::{FlagsRule, OperationsRule, ParamsRule, RealmsRule};
-
+mod commands;
 mod flags;
-mod operations;
-mod parameters;
-mod realms;
 mod transforms;
+
+use crate::engine::parse::flags::Flag;
 
 pub fn ident_to_variant(i: &Ident) -> Variant {
     parse_str::<Variant>(&format!("{}({})", i, i)).unwrap()
@@ -28,7 +26,7 @@ pub(crate) struct CookedCommandTree {
     // specifies wether to fail items on snake, kebab or not fail at all on both cases
     case: Case,
     // types to be generated
-    type_tree: GenerateTypeTree,
+    type_tree: Vec<Branch>,
     // includes the manually provided aliases + auto aliases if their flag is on
     // also resolves alias conflicts, if any
     aliases: Aliases,
@@ -44,24 +42,16 @@ pub(crate) struct CookedCommandTree {
 }
 
 #[derive(Debug)]
-struct GenerateTypeTree {
-    realms_rule: RealmsRule,
-    operations_rules: Vec<OperationsRule>,
-    flags_rules: Vec<FlagsRule>,
-    params_rules: Vec<ParamsRule>,
-}
-
-#[derive(Debug)]
 struct Branch {
     seq: Vec<CommandToken>,
 }
 
 #[derive(Debug)]
 enum CommandToken {
-    Realm { ident: Ident },
-    Operation { ident: Ident },
-    Flag { ident: Ident, ty: Type },
-    Param { ty: Type },
+    Space(Ident),
+    Operation(Ident),
+    Flag(Flag),
+    Param(Type),
 }
 
 #[derive(Debug)]

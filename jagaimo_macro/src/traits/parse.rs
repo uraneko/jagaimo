@@ -1,6 +1,6 @@
 // parsing
 // match args[..2] {
-// [realm, operation] =>
+// [space, operation] =>
 // [operation, ] =>
 // ...
 // }

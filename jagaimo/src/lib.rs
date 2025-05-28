@@ -80,7 +80,7 @@ use jagaimo_macro::jagaimo;
 // }
 // this allows parsing of git remote add ... commands
 // but not any other git remote <operation> ... commands
-// nor any other git <realm> ... commands
+// nor any other git <space> ... commands
 
 /// Description can be either
 /// inline: inside every item of the macro struct
@@ -90,17 +90,17 @@ use jagaimo_macro::jagaimo;
 /// the macro is not a real struct,
 /// you only need pass it what your cli needs
 ///
-/// if your cli commands dont use realms
-/// then skip the realms field
+/// if your cli commands dont use spaces
+/// then skip the spaces field
 ///
 /// likewise for operations
 ///
 /// you can use the macro rules to specify:
 /// * allowed sub scopes of a scope
-/// -> ops { !realm [add, remove, view] }
-/// <- no realm, cli operations are add, remove and view,
+/// -> ops { !space [add, remove, view] }
+/// <- no space, cli operations are add, remove and view,
 /// <- it is a compiler/expand error not to specify the rules necessary for the defined ops
-/// you can do the same to specify realms or flags
+/// you can do the same to specify spaces or flags
 /// * allowed parameter type for a scope
 /// -> params { operation(add) [String, u32] }
 /// <- all add operations under any scope can only take either a String or a u32
@@ -111,7 +111,7 @@ use jagaimo_macro::jagaimo;
 // HOWTO:
 // * define all the possible rules
 // * define all the possible flags (AliasWhenPossible is a flag), flags apply to rule types
-// (r.g., a flag for realms rule)
+// (r.g., a flag for spaces rule)
 // * define all the possible attributes (#[no_help] is an attribute), attrs apply to the macro
 // * define the valid syntax of all the rules, flags and attributes
 // * parse all the rules, flags and attrs into their asts
@@ -136,7 +136,7 @@ use jagaimo_macro::jagaimo;
 //         functional: Semantics::BARE
 //     ]),
 //
-//     realms: Realms {
+//     spaces: Spaces {
 //         syntax: Syntax,
 //         values: Vec<String>,
 //
@@ -156,10 +156,10 @@ use jagaimo_macro::jagaimo;
 //     // both would be valid
 //     // vec![
 //     //  { collections [list, add, remove, edit, view] }
-//     //  same as { realm(collections) [list, add, remove, edit, view] }
-//     //  <- operations of the collections realm
+//     //  same as { space(collections) [list, add, remove, edit, view] }
+//     //  <- operations of the collections space
 //     //  { [reset, reload, meta, version <- version is auto added here ] }
-//     //  same as { !realm [reset, reload, meta, version ] }
+//     //  same as { !space [reset, reload, meta, version ] }
 //     //  <- operations that apply directly to cli tool
 //     //  ...
 //     // ]
@@ -190,11 +190,11 @@ use jagaimo_macro::jagaimo;
 //     // NoDirectParams <- turns off scope params = all params must come from a flag
 //     // vec![
 //     //  { operation(add) [String] },
-//     //  all add operations no matter what realm (including !realm) they are called on
+//     //  all add operations no matter what space (including !space) they are called on
 //     //  can only take a single string parameter
-//     //  * this is valid:     cli realm add "my string value"
+//     //  * this is valid:     cli space add "my string value"
 //     //  * also valid:        cli add "my string value"
-//     //  * this is not valid: cli realm add 765
+//     //  * this is not valid: cli space add 765
 //     //  * also not valid:    cli add "some str" "and then" "another"
 //     //  { ! [u8, String, String+u8] },
 //     //  this makes this valid:      cli "str"
@@ -202,7 +202,7 @@ use jagaimo_macro::jagaimo;
 //     //  while this is invalid:      cli 434 <- 434 > u8::MAX
 //     //  this is also valid:         cli 123 "string" <- due to the last rule String+u8
 //     //  params are interchangeable: cli "string" 123
-//     //  { realm(collections) operation(add) Flag(source) [Vec<String>, Path] },
+//     //  { space(collections) operation(add) Flag(source) [Vec<String>, Path] },
 //     //  rule for the same operation add that is defined above for all uses
 //     //  this smaller scoped rule takes precedence over the more general rule
 //     //  so this:  cli collections add "this" "and that" <- is valid
@@ -230,25 +230,23 @@ jagaimo! {
         disable_derives(Debug, Clone)
     ]
 
-
     syntax {
+        // considers snake case to be the same as kebab case in command syntax
+        // AcceptSnake,
+        // accepts only snake case in command scope/flag syntax
+        SnakeOnly,
+        // auto generates an alias for every scope whenever possible
         AliasEagerly,
+        // adds an alias for a scope
         Alias(o(add) = a),
         Alias(r(remote) = rmt),
     }
 
-    // the cli tool has 4 realms (sub-commands)
-    r { [ collections, tags, history, algos ] }
-    // the collections realm can take one of the following 5 operations
-    o { collections [ list, add, remove, edit, view ] }
-    // this is a rule detailing flags with params
-    f { r(collections) o(list) [ max(u8), tagged, query((String, Vec<i32>)), tag(char), verbose ] }
-    // this rule describes direct caller params, but the context could still contain flags
-    p { r(history) o(view) [ u8, (String, bool), (String, Vec<i32>, char) ] }
-    f { r(collections) [ showcase(u8), dashboard(String) ] }
-    p { r(history) [ i32, HashMap<String, u8> ] }
-
-    o { history [ show, clean, reset ] }
+    c { s(history) o(view, list) [ (i32), filter(String), include, query(String) ] }
+    // t { r(colls) o(list) |_, base: String|
+    //         { if base == "_" { auto as bool } else { base "BASE{base}" as Base } }
+    // }
+    // t { r(history) |use_max| { use 453 as u32} }
 }
 
 // add trait Command {
@@ -258,18 +256,18 @@ jagaimo! {
 // help and version could have default impls that are used when auto gen is turned off
 // }
 
-// DOCS core concepts are realms, operations, flags and parameters
+// DOCS core concepts are spaces, operations, flags and parameters
 // definition of a cli tool
 //
 // semantic representation
 // a single cli tool commands can be either:
-// cli realm operation flags parameters
+// cli space operation flags parameters
 // cli operation flags parameters
 // cli flags parameters
 // a cli tool may make use of more than one of these
 //
 // syntatic representation
-// given a hypothetical realm 'external-databases, it can be written as:
+// given a hypothetical space 'external-databases, it can be written as:
 // Syntax{ Capital, Kebab } External-databases
 // Syntax{ Title, Kebab } External-Databases
 // Syntax{ Capital, Snake } External_databases
