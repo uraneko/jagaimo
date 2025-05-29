@@ -13,7 +13,8 @@ use syn::{
 use quote::ToTokens;
 
 use super::scope::Scope;
-use crate::engine::{discriminant, dummy_ident, dummy_type};
+use crate::process::{dummy_ident, dummy_type};
+use std::mem::discriminant;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Flag {
@@ -26,6 +27,13 @@ impl Flag {
         match self {
             Self::Bool(i) => i.to_string(),
             Self::Parameterized(i, t) => format!("{}({:?})", i, t.to_token_stream().to_string()),
+        }
+    }
+
+    pub fn ident(&self) -> &Ident {
+        match self {
+            Self::Bool(i) => i,
+            Self::Parameterized(i, _) => i,
         }
     }
 }

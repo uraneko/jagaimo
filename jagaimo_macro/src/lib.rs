@@ -13,21 +13,23 @@ use syn::parse_macro_input;
 // ---------------------------------------
 //             scope            context
 
-mod engine;
+mod generate;
+mod parse;
+mod process;
 mod resolve_crate;
-mod traits;
 
-use engine::{CommandTree, RuleBook};
+use parse::{CommandStack, Rules};
 
 #[proc_macro]
 pub fn jagaimo(input: TS) -> TS {
     // panic!("{:#?}", input);
-    let ct: CommandTree = parse_macro_input!(input);
-    // println!("{:#?}", ct);
-    let rb = ct.rules();
-    for c in rb.commands() {
-        println!("{}", c);
-    }
+    let mut ct: CommandStack = parse_macro_input!(input);
+    ct.resolve_aliases();
+    println!("{:#?}", ct.aliases_ref());
+    // let rb = ct.rules();
+    // for c in rb.commands() {
+    //     println!("{}", c);
+    // }
 
     quote! {}.into()
 }

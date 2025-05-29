@@ -10,7 +10,7 @@ use super::context::Flag;
 use super::extract_scope_items;
 use super::scope::Scope;
 
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct CommandRule {
     space: Option<Ident>,
     op: Option<Ident>,
@@ -18,7 +18,25 @@ pub struct CommandRule {
     flags: Option<Vec<Flag>>,
 }
 
-#[derive(Debug, Default, PartialEq)]
+impl CommandRule {
+    pub fn space(&self) -> Option<&Ident> {
+        self.space.as_ref()
+    }
+
+    pub fn op(&self) -> Option<&Ident> {
+        self.op.as_ref()
+    }
+
+    pub fn params(&self) -> Option<&Type> {
+        self.params.as_ref()
+    }
+
+    pub fn flags(&self) -> Option<&[Flag]> {
+        self.flags.as_ref().map(|v| v.as_slice())
+    }
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct ExpandedCommandRule {
     rules: Vec<CommandRule>,
 }
@@ -97,8 +115,6 @@ fn extract_context_items(s: ParseStream) -> ParseResult<(Vec<Flag>, Option<Type>
             p = Type::parse(&ty).ok();
         }
     }
-    println!("p {:?}", p);
-    println!("f {:?}", f);
 
     Ok((f, p))
 }

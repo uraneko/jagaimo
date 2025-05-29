@@ -1,5 +1,4 @@
-use crate::engine::parse::{Alias, Case};
-use crate::traits::Token;
+use crate::parse::Aliased;
 use std::collections::HashMap;
 
 // TODO the help struct and all its children types
@@ -13,7 +12,7 @@ use std::collections::HashMap;
 pub struct Help {
     main: Main,
     links: Links,
-    tokens: HashMap<Token, String>,
+    tokens: HashMap<String, String>,
     spaces: Spaces,
     operations: Operations,
     flags: Flags,

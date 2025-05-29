@@ -1,6 +1,6 @@
 //! the engine takes the macro inputs and parses them
-//! into a data form (RuleBook) that can be used by the macro
-//! so to say, the macro's direct input is the RuleBook struct
+//! into a data form (Rules) that can be used by the macro
+//! so to say, the macro's direct input is the Rules struct
 //!
 //! RULES TYPES:
 //! * r(egions) => defines all the spaces of the root scope, if any,
@@ -45,7 +45,6 @@
 //! <- renames the resulting top level cli type, default is crate name
 //! follows the rust naming convetions
 //! * ignore_naming_conventions <- turns off rust naming convetions for cli top level type
-
 use proc_macro2::Span;
 use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream, Result as ParseResult};
@@ -54,10 +53,9 @@ use syn::{braced, bracketed, parenthesized};
 
 use std::mem::discriminant;
 
-use super::Token;
-use super::dummy_ident;
+use crate::process::dummy_ident;
 use crate::resolve_crate::ResolveCrate;
-use crate::traits::Token;
+use syn::Token;
 
 pub mod commands;
 pub mod context;
@@ -83,12 +81,12 @@ pub fn extract_scope_items(s: ParseStream) -> ParseResult<Vec<Ident>> {
 }
 
 #[derive(Debug, Default)]
-pub struct RuleBook {
+pub struct Rules {
     commands: Vec<CommandRule>,
     transforms: Vec<TransformRule>,
 }
 
-impl RuleBook {
+impl Rules {
     fn push_commands(&mut self, commands: ExpandedCommandRule) {
         self.commands.extend(commands.into_rules());
     }
@@ -96,9 +94,7 @@ impl RuleBook {
     fn push_transform(&mut self, t: TransformRule) {
         self.transforms.push(t);
     }
-}
 
-impl RuleBook {
     pub fn commands(&self) -> &[CommandRule] {
         &self.commands
     }
@@ -106,9 +102,39 @@ impl RuleBook {
     pub fn transforms(&self) -> &[TransformRule] {
         &self.transforms
     }
+
+    // deduplicates command rules
+    pub fn dedup_commands(&mut self) {
+        let mut iter = vec![];
+        std::mem::swap(&mut self.commands, &mut iter);
+        let mut iter = iter.into_iter();
+
+        while let Some(c) = iter.next() {
+            if !self.commands.contains(&c) {
+                self.commands.push(c);
+            }
+        }
+    }
+
+    pub fn matches_commands(&self, al: &Aliased) -> bool {
+        self.commands
+            .iter()
+            .find(|c| {
+                if let (AliasToken::Space(st), Some(spc)) = (al.token(), c.space()) {
+                    st == spc
+                } else if let (AliasToken::Operation(o), Some(op)) = (al.token(), c.op()) {
+                    o == op
+                } else if let (AliasToken::Flag(flg), Some(flags)) = (al.token(), c.flags()) {
+                    flags.iter().any(|f| f.ident() == flg)
+                } else {
+                    false
+                }
+            })
+            .is_some()
+    }
 }
 
-impl Parse for RuleBook {
+impl Parse for Rules {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
         let mut rb = Self::default();
         while stream.peek(Ident::peek_any) {
@@ -129,6 +155,9 @@ pub struct Attributes {
     nu_cmp: bool,
     gen_help: bool,
     gen_ver: bool,
+    auto_alias: bool,
+    // name of the top level type of the cli tool
+    // also used in other types of the type tree when necessary
     root_name: String,
     ignore_naming_conventions: bool,
     branch_off_root: bool,
@@ -142,6 +171,7 @@ impl Default for Attributes {
             nu_cmp: true,
             gen_help: true,
             gen_ver: true,
+            auto_alias: true,
             ignore_naming_conventions: false,
             branch_off_root: false,
             root_name: "".into(),
@@ -168,6 +198,10 @@ impl Attributes {
             // so that Default can be implemented
             // Ident::new("Default", Span::call_site())
         ]
+    }
+
+    pub fn auto_alias(&self) -> bool {
+        self.auto_alias
     }
 }
 
@@ -203,6 +237,7 @@ impl Parse for Attributes {
                 "no_version" => attrs.gen_ver = false,
                 "branch_off_root" => attrs.branch_off_root = true,
                 "ignore_naming_conventions" => attrs.ignore_naming_conventions = true,
+                "no_auto_alias" => attrs.auto_alias = false,
                 "disable_derives" => {
                     let derives;
                     let paren = parenthesized!(derives in content);
@@ -226,137 +261,245 @@ impl Parse for Attributes {
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
-pub enum Case {
-    Snake,
-    #[default]
-    Kebab,
-    Both,
-}
-
 #[derive(Debug, Default)]
-pub struct Syntax {
-    case: Case,
-    alias_eagerly: bool,
-    aliases: Vec<Alias>,
+pub struct Aliases {
+    aliases: Vec<Aliased>,
 }
 
-#[derive(Debug)]
-pub struct Alias {
-    token: Token,
-    alias: String,
+#[derive(Debug, PartialEq)]
+pub struct Aliased {
+    token: AliasToken,
+    alias: Ident,
 }
 
-impl Parse for Syntax {
+impl Aliased {
+    pub fn from_values(token: AliasToken, alias: Ident) -> Self {
+        Self { alias, token }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum AliasToken {
+    Space(Ident),
+    Operation(Ident),
+    Flag(Ident),
+}
+
+impl AliasToken {
+    pub fn alias(&self) -> Option<Ident> {
+        let s = self.ident().to_string();
+        if s.len() < 4 {
+            return None;
+        }
+
+        Some(match self {
+            Self::Space(i) => Ident::new(&s[..4], Span::call_site()),
+            Self::Operation(i) | Self::Flag(i) => Ident::new(&s[..1], Span::call_site()),
+        })
+    }
+
+    pub fn is_space(&self) -> bool {
+        discriminant(self) == discriminant(&Self::Space(dummy_ident()))
+    }
+
+    pub fn is_operation(&self) -> bool {
+        discriminant(self) == discriminant(&Self::Operation(dummy_ident()))
+    }
+
+    pub fn is_flag(&self) -> bool {
+        discriminant(self) == discriminant(&Self::Flag(dummy_ident()))
+    }
+
+    pub fn space(&self) -> Option<&Ident> {
+        let Self::Space(i) = self else { return None };
+
+        Some(i)
+    }
+
+    pub fn operation(&self) -> Option<&Ident> {
+        let Self::Operation(i) = self else {
+            return None;
+        };
+
+        Some(i)
+    }
+
+    pub fn flag(&self) -> Option<&Ident> {
+        let Self::Flag(i) = self else { return None };
+        Some(i)
+    }
+
+    pub fn ident(&self) -> &Ident {
+        match self {
+            Self::Flag(i) | Self::Operation(i) | Self::Space(i) => i,
+        }
+    }
+}
+
+impl TryFrom<[Ident; 2]> for AliasToken {
+    type Error = syn::Error;
+
+    fn try_from(mut idents: [Ident; 2]) -> ParseResult<Self> {
+        let [a, b] = std::mem::replace(&mut idents, [dummy_ident(), dummy_ident()]);
+
+        match a {
+            i if i == Ident::new("s", Span::call_site()) => Ok(Self::Space(b)),
+            i if i == Ident::new("o", Span::call_site()) => Ok(Self::Operation(b)),
+            i if i == Ident::new("f", Span::call_site()) => Ok(Self::Flag(b)),
+            _ => Err(syn::Error::new(
+                Span::call_site(),
+                "bad scope for alias; use s, o or f",
+            )),
+        }
+    }
+}
+
+impl TryFrom<[Ident; 3]> for Aliased {
+    type Error = syn::Error;
+
+    fn try_from(mut idents: [Ident; 3]) -> ParseResult<Self> {
+        let [a, b, c] =
+            std::mem::replace(&mut idents, [dummy_ident(), dummy_ident(), dummy_ident()]);
+
+        Ok(Self {
+            alias: c,
+            token: [a, b].try_into()?,
+        })
+    }
+}
+
+fn extract_aliased(content: ParseStream) -> ParseResult<Aliased> {
+    let temp;
+    let scope = Ident::parse(&content)?;
+    _ = parenthesized!(temp in content);
+    let origin = Ident::parse(&temp)?;
+    _ = <Token![=]>::parse(&content)?;
+    let alias = Ident::parse(&content)?;
+
+    [scope, origin, alias].try_into()
+}
+
+impl Parse for Aliases {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
-        let mut syntax = Syntax::default();
-        // parse the syntax ident
+        let mut aliases = vec![];
+        // parse the aliases ident
         _ = Ident::parse(stream)?;
         let content;
         let brace = braced!(content in stream);
 
-        let mut temp;
-        let mut subtemp;
         while content.peek(Ident::peek_any) {
-            match Ident::parse(&content)?.to_string().as_str() {
-                "AliasEagerly" => syntax.alias_eagerly = true,
-                "SnakeOnly" => {
-                    if syntax.case != Case::Both {
-                        syntax.case = Case::Snake
-                    }
-                }
-                "AllowSnakeCase" => syntax.case = Case::Both,
-                "Alias" => {
-                    _ = parenthesized!(temp in content);
-                    let scope = Ident::parse(&temp)?;
-                    _ = parenthesized!(subtemp in temp);
-                    let origin = Ident::parse(&subtemp)?;
-                    _ = <Token![=]>::parse(&temp)?;
-                    let alias = Ident::parse(&temp)?;
-
-                    syntax.aliases.push([scope, origin, alias].into());
-                }
-                val => unimplemented!("unemplemented syntax rule {}", val),
-            }
+            aliases.push(extract_aliased(&content)?);
 
             if !content.is_empty() {
                 _ = <Token![,]>::parse(&content)?;
             }
         }
 
-        Ok(syntax)
+        Ok(Aliases { aliases })
     }
 }
 
-impl From<[Ident; 2]> for Token {
-    fn from(value: [Ident; 2]) -> Self {
-        let val = value[1].to_string();
-        match value[0].to_string().as_str() {
-            "r" => Token::Space(val),
-            "o" => Token::Operation(val),
-            // WARN this cant generate all flag tokens properly
-            // since parameterized flag tokens contain their params data and
-            // this doesnt have access to those params, which are runtime values
-            // NOTE then again, the alias itself has no use for the params
-            // it functions correctly without that info
-            // the only problem is that Token::Flag is a boolean flag
-            // which is a misrepresentation for parameterized flags
-            "f" => Token::Flag(val),
-            _ => panic!("aliases can only be made for space (r), operation (o) or a flag (f)"),
+impl Aliases {
+    pub fn aliases(&self) -> &[Aliased] {
+        &self.aliases
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Aliased> {
+        self.aliases.iter_mut()
+    }
+
+    pub fn from_values(values: Vec<Aliased>) -> Self {
+        Self { aliases: values }
+    }
+
+    pub fn into_iter(self) -> impl Iterator<Item = Aliased> {
+        self.aliases.into_iter()
+    }
+
+    pub fn push(&mut self, aliased: Aliased) {
+        self.aliases.push(aliased);
+    }
+
+    pub fn contains(&self, a: &Aliased) -> bool {
+        self.aliases
+            .iter()
+            .find(|al| {
+                std::mem::discriminant(al.token()) == std::mem::discriminant(a.token())
+                    && a.alias() == al.alias()
+            })
+            .is_some()
+    }
+}
+
+impl Aliased {
+    pub fn token(&self) -> &AliasToken {
+        &self.token
+    }
+
+    pub fn alias(&self) -> &Ident {
+        &self.alias
+    }
+}
+
+macro_rules! alias_token {
+    ('s', $i: ident) => {
+        AliasToken::Space($i.clone())
+    };
+    ('o', $i: ident) => {
+        AliasToken::Operation($i.clone())
+    };
+    ('f', $i: ident) => {
+        AliasToken::Flag($i.clone())
+    };
+    ($s: ident, $i: ident) => {
+        match $s {
+            's' => AliasToken::Space($i.clone()),
+            'o' => AliasToken::Operation($i.clone()),
+            'f' => AliasToken::Flag($i.clone()),
+            v => panic!("alias_token: received bad input for scope {}", v),
         }
-    }
+    };
 }
 
-impl From<[Ident; 3]> for Alias {
-    fn from(mut value: [Ident; 3]) -> Self {
-        use std::mem::swap;
-
-        let [mut a, mut b, mut c] = [dummy_ident(), dummy_ident(), dummy_ident()];
-
-        swap(&mut a, &mut value[0]);
-        swap(&mut b, &mut value[1]);
-        swap(&mut c, &mut value[2]);
-
-        Self {
-            token: [a, b].into(),
-            alias: c.to_string(),
-        }
-    }
-}
+pub(crate) use alias_token;
 
 #[derive(Debug)]
-pub struct CommandTree {
+pub struct CommandStack {
     attrs: Attributes,
-    rules: RuleBook,
-    syntax: Syntax,
+    rules: Rules,
+    aliases: Aliases,
 }
 
-impl Parse for CommandTree {
+impl Parse for CommandStack {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
-        let (mut attrs, mut rules, mut syntax) =
+        let (mut attrs, mut rules, mut aliases) =
             (Default::default(), Default::default(), Default::default());
         while !stream.is_empty() {
             if stream.peek(Token![#]) {
                 attrs = Attributes::parse(stream)?;
             } else if stream.peek(Ident::peek_any) {
-                if stream.fork().parse::<Ident>()?.to_string().as_str() == "syntax" {
-                    syntax = Syntax::parse(stream)?;
+                if stream.fork().parse::<Ident>()?.to_string().as_str() == "aliases" {
+                    aliases = Aliases::parse(stream)?;
                 } else {
-                    rules = RuleBook::parse(stream)?;
+                    rules = Rules::parse(stream)?;
                 }
             }
         }
 
         Ok(Self {
             attrs,
-            syntax,
+            aliases,
             rules,
         })
     }
 }
 
-impl CommandTree {
-    pub fn rules(&self) -> &RuleBook {
+impl CommandStack {
+    pub fn rules_mut(&mut self) -> &mut Rules {
+        &mut self.rules
+    }
+
+    pub fn rules_ref(&self) -> &Rules {
         &self.rules
     }
 
@@ -364,7 +507,15 @@ impl CommandTree {
         &self.attrs
     }
 
-    pub fn syntax(&self) -> &Syntax {
-        &self.syntax
+    pub fn aliases_ref(&self) -> &Aliases {
+        &self.aliases
+    }
+
+    pub fn aliases_mut(&mut self) -> &mut Aliases {
+        &mut self.aliases
+    }
+
+    pub fn set_aliases(&mut self, als: &mut Aliases) {
+        self.aliases = std::mem::take(als);
     }
 }

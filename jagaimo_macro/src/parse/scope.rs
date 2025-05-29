@@ -2,7 +2,7 @@ use proc_macro2::Span;
 use syn::Ident;
 use syn::parse::{Parse, ParseStream, Result as ParseResult};
 
-use crate::engine::dummy_ident;
+use crate::process::dummy_ident;
 
 use std::mem::discriminant;
 
