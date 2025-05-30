@@ -2,24 +2,28 @@
 description = "brief description of the cli tool"
 
 [links]
-issue_tracker = ""
-src_code = ""
-website = ""
+issue_tracker = "https://www.github.com/uraneko/jagaimo/issues"
+src_code = "https://www.github.com/uraneko/jagaimo"
+website = "???"
 
 [links.extra]
-cli_specific_link = ""
+github = "https://www.github.com/uraneko"
 
-[spaces]
+[[space]]
 collections = "operations for managing collections"
 
-[operations]
-add = "create a new item and add it to existing group"
-# this superseed the above general description for the add ope when the space is collections 
-collections.add = "add a new collection to the collections database"
+[[operation]]
+"*.add" = "create a new item and add it to existing group"
 
-[flags]
-# the syntax <r|o> means replace itself with the space name, 
-# and if there is no space for that flag's scope then with operation name
-size = "specify the size of the <r|o> "
+[[operation]]
+name = "add"
+scope = "collections" 
+# this superseed the above general description for the add ope when the space is collections 
+content = "add a new collection to the collections database"
+
+[[flag]]
+root.size = "specify the size of the item"
+
+[[flag]]
 # this specific rule supersedes any other limit flag rule for command history query --limit
 history.query.limit = "sets the limit of the history query results count"

@@ -103,6 +103,34 @@ impl Rules {
         &self.commands
     }
 
+    pub fn space_variants(&self) -> Vec<String> {
+        let mut s = self
+            .commands
+            .iter()
+            .filter(|c| c.space().is_some())
+            .map(|c| c.space().unwrap().to_string())
+            .collect::<Vec<String>>();
+        s.sort_unstable();
+        s.dedup();
+
+        s
+    }
+
+    pub fn non_space_variants(&self) -> Vec<Ident> {
+        self.commands
+            .iter()
+            .filter(|c| c.space().is_none())
+            .map(|c| {
+                if let Some(o) = c.op() {
+                    // get the operation name
+                    o.clone()
+                } else {
+                    Ident::new("AnonymousOp", Span::call_site())
+                }
+            })
+            .collect()
+    }
+
     pub fn transforms(&self) -> &[TransformRule] {
         &self.transforms
     }
@@ -213,6 +241,10 @@ impl Attributes {
 
     pub fn auto_alias(&self) -> bool {
         self.auto_alias
+    }
+
+    pub fn root_name(&self) -> &str {
+        &self.root_name
     }
 }
 

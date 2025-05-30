@@ -25,14 +25,15 @@ pub fn jagaimo(input: TS) -> TS {
     // panic!("{:#?}", input);
     let mut ct: CommandStack = parse_macro_input!(input);
 
-    let rules = ct.rules_ref();
-    for c in rules.commands() {
-        println!("{}", c);
-    }
+    // let rules = ct.rules_ref();
+    // for c in rules.commands() {
+    //     println!("{}", c);
+    // }
 
-    ct.resolve_aliases();
-    let cmds = ct.tokenize_commands();
-    println!("{:#?}", cmds);
+    let name = ct.attrs().root_name();
+    ct.rules_ref().generate_root(name).into()
 
-    quote! {}.into()
+    // ct.resolve_aliases();
+    // let cmds = ct.tokenize_commands();
+    // println!("{:#?}", cmds);
 }

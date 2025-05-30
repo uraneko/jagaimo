@@ -16,6 +16,7 @@ use crate::parse::{Aliased, CommandRule};
 use crate::parse::{CommandStack, Rules, flags::Flag};
 
 pub mod aliases;
+pub mod cmd_type_tree;
 pub mod tokenized_commands;
 
 pub fn dummy_ident() -> Ident {
