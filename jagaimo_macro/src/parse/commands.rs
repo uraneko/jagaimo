@@ -38,6 +38,10 @@ impl CommandRule {
         self.flags.as_ref().map(|v| v.as_slice())
     }
 
+    pub fn set_op(&mut self, i: Ident) {
+        self.op = Some(i);
+    }
+
     pub fn find_space_alias<'a>(&self, als: &'a [Aliased]) -> Option<&'a Ident> {
         if let Some(spc) = self.space() {
             return als

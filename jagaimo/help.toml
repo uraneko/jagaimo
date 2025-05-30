@@ -9,21 +9,17 @@ website = "???"
 [links.extra]
 github = "https://www.github.com/uraneko"
 
-[[space]]
+[spaces]
 collections = "operations for managing collections"
 
-[[operation]]
+[operations]
 "*.add" = "create a new item and add it to existing group"
 
-[[operation]]
-name = "add"
-scope = "collections" 
 # this superseed the above general description for the add ope when the space is collections 
-content = "add a new collection to the collections database"
+collections.add = "add a new collection to the collections database"
 
-[[flag]]
+[flags]
 root.size = "specify the size of the item"
 
-[[flag]]
 # this specific rule supersedes any other limit flag rule for command history query --limit
 history.query.limit = "sets the limit of the history query results count"
