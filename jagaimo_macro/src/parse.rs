@@ -103,6 +103,13 @@ impl Rules {
         &self.transforms
     }
 
+    pub fn command_matches(&self, command: &CommandRule) -> bool {
+        self.commands
+            .iter()
+            .find(|cr| cr.space() == command.space() && cr.op() == command.op())
+            .is_some()
+    }
+
     // deduplicates command rules
     pub fn dedup_commands(&mut self) {
         let mut iter = vec![];
@@ -110,7 +117,7 @@ impl Rules {
         let mut iter = iter.into_iter();
 
         while let Some(c) = iter.next() {
-            if !self.commands.contains(&c) {
+            if !self.command_matches(&c) {
                 self.commands.push(c);
             }
         }
