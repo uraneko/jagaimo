@@ -87,12 +87,16 @@ pub struct Rules {
 }
 
 impl Rules {
-    fn push_commands(&mut self, commands: ExpandedCommandRule) {
+    pub fn push_commands(&mut self, commands: ExpandedCommandRule) {
         self.commands.extend(commands.into_rules());
     }
 
-    fn push_transform(&mut self, t: TransformRule) {
+    pub fn push_transform(&mut self, t: TransformRule) {
         self.transforms.push(t);
+    }
+
+    pub fn take_commands(&mut self) -> Vec<CommandRule> {
+        std::mem::take(&mut self.commands)
     }
 
     pub fn commands(&self) -> &[CommandRule] {
@@ -123,7 +127,7 @@ impl Rules {
         }
     }
 
-    pub fn matches_commands(&self, al: &Aliased) -> bool {
+    pub fn alias_matches_commands(&self, al: &Aliased) -> bool {
         self.commands
             .iter()
             .find(|c| {
@@ -407,20 +411,20 @@ impl Parse for Aliases {
 }
 
 impl Aliases {
-    pub fn aliases(&self) -> &[Aliased] {
+    pub fn aliases_ref(&self) -> &[Aliased] {
         &self.aliases
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Aliased> {
-        self.aliases.iter_mut()
+    pub fn aliases_mut(&mut self) -> &mut Vec<Aliased> {
+        &mut self.aliases
+    }
+
+    pub fn into_aliases(self) -> Vec<Aliased> {
+        self.aliases
     }
 
     pub fn from_values(values: Vec<Aliased>) -> Self {
         Self { aliases: values }
-    }
-
-    pub fn into_iter(self) -> impl Iterator<Item = Aliased> {
-        self.aliases.into_iter()
     }
 
     pub fn push(&mut self, aliased: Aliased) {
@@ -502,6 +506,14 @@ impl Parse for CommandStack {
 }
 
 impl CommandStack {
+    pub fn take_rules(&mut self) -> Rules {
+        std::mem::take(&mut self.rules)
+    }
+
+    pub fn take_aliases(&mut self) -> Aliases {
+        std::mem::take(&mut self.aliases)
+    }
+
     pub fn rules_mut(&mut self) -> &mut Rules {
         &mut self.rules
     }

@@ -5,10 +5,13 @@ use syn::{braced, bracketed, parenthesized};
 
 use quote::ToTokens;
 
+use super::AliasToken;
+use super::Aliased;
 use super::context::Context;
 use super::context::Flag;
 use super::extract_scope_items;
 use super::scope::Scope;
+use crate::process::CommandToken;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CommandRule {
@@ -33,6 +36,63 @@ impl CommandRule {
 
     pub fn flags(&self) -> Option<&[Flag]> {
         self.flags.as_ref().map(|v| v.as_slice())
+    }
+
+    pub fn find_space_alias<'a>(&self, als: &'a [Aliased]) -> Option<&'a Ident> {
+        if let Some(spc) = self.space() {
+            return als
+                .iter()
+                .find(|a| {
+                    if let AliasToken::Space(s) = a.token() {
+                        s == spc
+                    } else {
+                        false
+                    }
+                })
+                .map(|a| a.alias());
+        }
+
+        None
+    }
+
+    pub fn find_op_alias<'a>(&self, als: &'a [Aliased]) -> Option<&'a Ident> {
+        if let Some(op) = self.op() {
+            return als
+                .iter()
+                .find(|a| {
+                    if let AliasToken::Operation(o) = a.token() {
+                        o == op
+                    } else {
+                        false
+                    }
+                })
+                .map(|a| a.alias());
+        }
+
+        None
+    }
+    pub fn find_flags_aliases(
+        &self,
+        als: &[Aliased],
+    ) -> Option<impl Iterator<Item = Option<CommandToken>>> {
+        if let Some(flags) = self.flags() {
+            Some(flags.iter().map(|flg| {
+                als.iter()
+                    .find(|a| {
+                        if let AliasToken::Flag(f) = a.token() {
+                            f == flg.ident()
+                        } else {
+                            false
+                        }
+                    })
+                    .map(|a| CommandToken::Flag {
+                        flag: flg.clone(),
+                        alias: Some(a.alias().clone()),
+                    })
+            }))
+        } else {
+            None
+        }
     }
 }
 

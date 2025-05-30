@@ -1,4 +1,4 @@
-use super::{CommandToken, TokenizedCommand, TokenizedCommands};
+use super::{CommandToken, TokenizedCommand};
 use crate::parse::alias_token;
 use crate::parse::{AliasToken, Aliased, Aliases, CommandRule, CommandStack, Rules};
 use syn::Ident;
@@ -29,12 +29,14 @@ impl CommandStack {
     }
 
     pub fn resolve_aliases(&mut self) {
+        // remove command rule duplicates
         self.rules_mut().dedup_commands();
 
         let mut als = std::mem::take(self.aliases_mut());
         als = Aliases::from_values(
-            als.into_iter()
-                .filter(|a| self.rules_ref().matches_commands(a))
+            als.into_aliases()
+                .into_iter()
+                .filter(|a| self.rules_ref().alias_matches_commands(a))
                 .collect(),
         );
         self.set_aliases(&mut als);

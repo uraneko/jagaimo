@@ -24,12 +24,15 @@ use parse::{CommandStack, Rules};
 pub fn jagaimo(input: TS) -> TS {
     // panic!("{:#?}", input);
     let mut ct: CommandStack = parse_macro_input!(input);
+
+    let rules = ct.rules_ref();
+    for c in rules.commands() {
+        println!("{}", c);
+    }
+
     ct.resolve_aliases();
-    println!("{:#?}", ct.aliases_ref());
-    // let rb = ct.rules();
-    // for c in rb.commands() {
-    //     println!("{}", c);
-    // }
+    let cmds = ct.tokenize_commands();
+    println!("{:#?}", cmds);
 
     quote! {}.into()
 }
