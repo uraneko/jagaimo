@@ -80,24 +80,19 @@ impl ReadManifest {
         [iter.next().unwrap(), iter.next().unwrap()]
     }
 
-    pub(crate) fn crate_name(&self) -> String {
-        let mut iter = self
-            .manifest
+    pub(crate) fn crate_name(&self) -> &str {
+        self.manifest
             .lines()
-            .filter(|l| l.starts_with("name = ") || l.starts_with("version = "))
-            .map(|l| l.to_owned());
-
-        iter.next().unwrap()
+            .find(|l| l.starts_with("name = "))
+            .map(|l| &l[8..l.len() - 1])
+            .unwrap()
     }
 
-    pub(crate) fn crate_version(&self) -> String {
-        let mut iter = self
-            .manifest
+    pub(crate) fn crate_version(&self) -> &str {
+        self.manifest
             .lines()
-            .filter(|l| l.starts_with("name = ") || l.starts_with("version = "))
-            .map(|l| l.to_owned());
-        iter.next();
-
-        iter.next().unwrap()
+            .find(|l| l.starts_with("version = "))
+            .map(|l| &l[10..l.len() - 1])
+            .unwrap()
     }
 }

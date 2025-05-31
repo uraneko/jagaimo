@@ -7,7 +7,7 @@ jagaimo! {
         branch_off_root,
         nu_cmp,
         fish_cmp,
-        root_name = "jagaimo",
+        root_name = "nikujaga_from_jagaimo",
         ignore_naming_conventions,
         // no_auto_alias,
         disable_derives(Debug, Clone),

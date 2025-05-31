@@ -176,6 +176,7 @@ impl Rules {
 impl Parse for Rules {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
         let mut rb = Self::default();
+        let mut incr = 0;
         while stream.peek(Ident::peek_any) {
             match &Ident::parse(stream)?.to_string()[..] {
                 "t" => unimplemented!(),
@@ -213,14 +214,14 @@ impl Default for Attributes {
             auto_alias: true,
             ignore_naming_conventions: false,
             branch_off_root: false,
-            root_name: "".into(),
+            root_name: ResolveCrate::new().read_manifest().crate_name().to_owned(),
             derives: Self::default_derives(),
         }
     }
 }
 
 impl Attributes {
-    fn new(name: String) -> Self {
+    fn with_name(name: String) -> Self {
         Self {
             root_name: name,
             ..Self::default()
@@ -250,8 +251,7 @@ impl Attributes {
 
 impl Parse for Attributes {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
-        let name = ResolveCrate::new().read_manifest().crate_name();
-        let mut attrs = Attributes::new(name);
+        let mut attrs = Attributes::default();
 
         _ = <Token![#]>::parse(stream)?;
         let content;
@@ -299,8 +299,25 @@ impl Parse for Attributes {
                 _ = <Token![,]>::parse(&content)?;
             }
         }
+        // TODO dont capitalize any type name when this flag is on
+        if !attrs.ignore_naming_conventions {
+            // TODO: all type tree type idents need this
+            enforce_nc(&mut attrs.root_name);
+        }
 
         Ok(attrs)
+    }
+}
+
+// enforces naming conventions on root type name
+fn enforce_nc(name: &mut String) {
+    while let Some(idx) = name.find('_') {
+        let next = name.get(idx + 1..idx + 2);
+        println!(">>{:?}", next);
+        if let Some(s) = next {
+            println!("<<{}", &name[idx..idx + 2]);
+            name.replace_range(idx..idx + 2, &s.to_ascii_uppercase());
+        }
     }
 }
 

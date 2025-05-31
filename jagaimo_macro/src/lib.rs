@@ -26,6 +26,7 @@ use parse::{CommandStack, Rules};
 pub fn jagaimo(input: TS) -> TS {
     // panic!("{:#?}", input);
     let mut ct: CommandStack = parse_macro_input!(input);
+    println!("000");
 
     // NOTE print commands
     // let rules = ct.rules_ref();
