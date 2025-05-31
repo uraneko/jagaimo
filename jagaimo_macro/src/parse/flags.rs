@@ -50,12 +50,15 @@ impl Parse for Flag {
             return Ok(Self::Bool(ident));
         }
 
-        if s.peek(Paren) {
-            let content;
-            _ = parenthesized!(content in s);
-            let mut ty = Type::parse(&content)?;
+        if s.peek(Token![<]) {
+            // _ = parenthesized!(content in s);
+            _ = <Token![<]>::parse(s)?;
+            let ty = Type::parse(s)?;
+            _ = <Token![>]>::parse(s)?;
+
             return Ok(Self::Parameterized(ident, ty));
         }
+
         Ok(Self::Bool(ident))
     }
 }

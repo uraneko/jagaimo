@@ -119,6 +119,8 @@ impl ExpandedCommandRule {
 // TODO optimize this
 impl Parse for ExpandedCommandRule {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
+        let _rule_name = Ident::parse(stream)?;
+
         let content;
         _ = braced!(content in stream);
         // there is some scope
@@ -158,25 +160,15 @@ fn extract_context_items(s: ParseStream) -> ParseResult<(Vec<Flag>, Option<Type>
     let mut f = vec![];
     let mut p = None;
 
-    if s.peek(Ident::peek_any) {
-        f.push(Flag::parse(s)?);
-    // param
-    } else {
-        let ty;
-        _ = parenthesized!(ty in s);
-        p = Type::parse(&ty).ok();
-    }
-
     while !s.is_empty() {
-        _ = <Token![,]>::parse(s)?;
         // flag
         if s.peek(Ident::peek_any) {
             f.push(Flag::parse(s)?);
         // param
         } else {
-            let ty;
-            _ = parenthesized!(ty in s);
-            p = Type::parse(&ty).ok();
+            _ = <Token![<]>::parse(s)?;
+            p = Type::parse(s).ok();
+            _ = <Token![>]>::parse(s)?;
         }
     }
 

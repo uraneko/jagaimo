@@ -87,7 +87,7 @@ pub struct Rules {
 }
 
 impl Rules {
-    pub fn push_commands(&mut self, commands: ExpandedCommandRule) {
+    pub fn push_command(&mut self, commands: ExpandedCommandRule) {
         self.commands.extend(commands.into_rules());
     }
 
@@ -176,11 +176,10 @@ impl Rules {
 impl Parse for Rules {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
         let mut rb = Self::default();
-        let mut incr = 0;
         while stream.peek(Ident::peek_any) {
             match &Ident::parse(stream)?.to_string()[..] {
                 "t" => unimplemented!(),
-                "c" => rb.push_commands(ExpandedCommandRule::parse(stream)?),
+                "c" => rb.push_command(ExpandedCommandRule::parse(stream)?),
                 val => panic!("expected c or t found {:?}", val),
             }
         }
@@ -255,7 +254,7 @@ impl Parse for Attributes {
 
         _ = <Token![#]>::parse(stream)?;
         let content;
-        let bracket = bracketed!(content in stream);
+        let _brackets = bracketed!(content in stream);
         // WARN doesnt work
         // cus not all attrs are boolean
         while content.peek(Ident::peek_any) {
@@ -283,8 +282,8 @@ impl Parse for Attributes {
                 "no_auto_alias" => attrs.auto_alias = false,
                 "disable_derives" => {
                     let derives;
-                    let paren = parenthesized!(derives in content);
-                    let disable = derives
+                    let _parens = parenthesized!(derives in content);
+                    derives
                         .parse_terminated(Ident::parse, Token![,])?
                         .into_iter()
                         .for_each(|d| {
@@ -293,15 +292,16 @@ impl Parse for Attributes {
                             }
                         });
                 }
-                val => panic!("unrecognized fake attribute {}", val),
+                val => panic!("unrecognized mock attribute {}", val),
             }
+
             if !content.is_empty() {
                 _ = <Token![,]>::parse(&content)?;
             }
         }
         // TODO dont capitalize any type name when this flag is on
         if !attrs.ignore_naming_conventions {
-            // TODO: all type tree type idents need this
+            // TODO all type tree type idents need this
             enforce_nc(&mut attrs.root_name);
         }
 
@@ -309,13 +309,19 @@ impl Parse for Attributes {
     }
 }
 
+// NOTE added first char capitalization here,
+// will deprecate capitalize_ident fn
+//
 // enforces naming conventions on root type name
 fn enforce_nc(name: &mut String) {
+    name.replace_range(
+        0..1,
+        &name.get(0..1).map(|s| s.to_ascii_uppercase()).unwrap(),
+    );
+
     while let Some(idx) = name.find('_') {
         let next = name.get(idx + 1..idx + 2);
-        println!(">>{:?}", next);
         if let Some(s) = next {
-            println!("<<{}", &name[idx..idx + 2]);
             name.replace_range(idx..idx + 2, &s.to_ascii_uppercase());
         }
     }
@@ -532,18 +538,25 @@ pub struct CommandStack {
 
 impl Parse for CommandStack {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
-        let (mut attrs, mut rules, mut aliases) =
-            (Default::default(), Default::default(), Default::default());
+        let (attrs, mut rules, mut aliases) =
+            (Attributes::parse(stream)?, Rules::default(), Aliases::default());
+
         while !stream.is_empty() {
-            if stream.peek(Token![#]) {
-                attrs = Attributes::parse(stream)?;
-            } else if stream.peek(Ident::peek_any) {
-                if stream.fork().parse::<Ident>()?.to_string().as_str() == "aliases" {
-                    aliases = Aliases::parse(stream)?;
-                } else {
-                    rules = Rules::parse(stream)?;
+
+            // TODO this could be better handled 
+                match stream.fork().parse::<Ident>()? {
+                  i if i ==   Ident::new("c", Span::call_site()) => 
+                        rules.push_command(ExpandedCommandRule::parse(stream)?),
+                    
+                   i if i== Ident::new("t", Span::call_site()) => 
+unimplemented!("transform rules have not been implemented yet"),
+                  i if  [Ident::new("s", Span::call_site()),
+                     Ident::new("o", Span::call_site()),
+                  Ident::new("f", Span::call_site())].contains(&i) => 
+            aliases.push(extract_aliased(stream)?),
+                    val => panic!("expected s, o, f, c or t ident, got {}", val)
                 }
-            }
+            
         }
 
         Ok(Self {

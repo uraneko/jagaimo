@@ -22,11 +22,32 @@ mod resolve_crate;
 
 use parse::{CommandStack, Rules};
 
+// BUG
+// error: expected identifier, found `,`
+//   --> jagaimo/src/lib.rs:3:1
+//    |
+// 3  | / jagaimo! {
+// 4  | |     #[
+// 5  | |         no_help,
+// 6  | |         no_version,
+// ...  |
+// 29 | | }
+//    | | ^
+//    | | |
+//    | |_expected identifier
+//    |   while parsing this struct
+//    |
+//    = note: this error originates in the macro `jagaimo` (in Nightly builds, run with -Z macro-backtrace for more info)
+//
+// the macro generated structs look normal upon expansion and they compile safely in a playground
+// this is not a macro parsing problem as the macro parses and generates code as intended
+// this is a compiler parsing problem. the compiler cant accepet some of the macro input; it
+// doesn't lex into proper rust tokens
+
 #[proc_macro]
 pub fn jagaimo(input: TS) -> TS {
     // panic!("{:#?}", input);
     let mut ct: CommandStack = parse_macro_input!(input);
-    println!("000");
 
     // NOTE print commands
     // let rules = ct.rules_ref();
@@ -47,4 +68,6 @@ pub fn jagaimo(input: TS) -> TS {
 
     // NOTE once the type tree is done
     // i can make the parse fn from the tokens
+
+    // quote! {}.into()
 }
