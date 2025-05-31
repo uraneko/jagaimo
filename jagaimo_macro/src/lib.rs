@@ -57,9 +57,12 @@ pub fn jagaimo(input: TS) -> TS {
 
     // NOTE type tree generation
     let name = ct.attrs().root_name();
-    ct.rules_ref()
-        .generate_type_tree(&Ident::new(name, Span::call_site()))
-        .into()
+    let res = ct
+        .rules_ref()
+        .generate_type_tree(&Ident::new(name, Span::call_site()));
+    println!("{}", res);
+
+    res.into()
 
     // NOTE tokenizes the commands and injects aliases to tokens
     // ct.resolve_aliases();

@@ -36,7 +36,7 @@ impl Rules {
         match variant_count {
             1 => {
                 let ident = variants.next().unwrap();
-                quote! { struct #name ( #ident ) }
+                quote! { struct #name ( #ident ); }
             }
             len => quote! { enum #name { #(#variants,)* } },
         }
@@ -75,7 +75,7 @@ impl Rules {
         if variants.len() == 1 {
             let variant = variants.into_iter().next().unwrap();
 
-            quote! { struct #ident ( #variant )
+            quote! { struct #ident ( #variant );
                 #anon
             }
         } else {
@@ -100,7 +100,7 @@ impl Rules {
         if variants.len() == 1 {
             let variant = variants.into_iter().next().unwrap();
 
-            quote! { struct #ident ( #variant )
+            quote! { struct #ident ( #variant );
                 #anon
             }
         } else {
@@ -126,9 +126,8 @@ impl Rules {
 
         quote! {
             struct #ident {
-                #fields,
+                #fields
                 #params
-
             }
         }
     }
