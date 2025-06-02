@@ -538,25 +538,33 @@ pub struct CommandStack {
 
 impl Parse for CommandStack {
     fn parse(stream: ParseStream) -> ParseResult<Self> {
-        let (attrs, mut rules, mut aliases) =
-            (Attributes::parse(stream)?, Rules::default(), Aliases::default());
+        let (attrs, mut rules, mut aliases) = (
+            Attributes::parse(stream)?,
+            Rules::default(),
+            Aliases::default(),
+        );
 
         while !stream.is_empty() {
-
-            // TODO this could be better handled 
-                match stream.fork().parse::<Ident>()? {
-                  i if i ==   Ident::new("c", Span::call_site()) => 
-                        rules.push_command(ExpandedCommandRule::parse(stream)?),
-                    
-                   i if i== Ident::new("t", Span::call_site()) => 
-unimplemented!("transform rules have not been implemented yet"),
-                  i if  [Ident::new("s", Span::call_site()),
-                     Ident::new("o", Span::call_site()),
-                  Ident::new("f", Span::call_site())].contains(&i) => 
-            aliases.push(extract_aliased(stream)?),
-                    val => panic!("expected s, o, f, c or t ident, got {}", val)
+            // TODO this could be better handled
+            match stream.fork().parse::<Ident>()? {
+                i if i == Ident::new("c", Span::call_site()) => {
+                    rules.push_command(ExpandedCommandRule::parse(stream)?)
                 }
-            
+
+                i if i == Ident::new("t", Span::call_site()) => {
+                    unimplemented!("transform rules have not been implemented yet")
+                }
+                i if [
+                    Ident::new("s", Span::call_site()),
+                    Ident::new("o", Span::call_site()),
+                    Ident::new("f", Span::call_site()),
+                ]
+                .contains(&i) =>
+                {
+                    aliases.push(extract_aliased(stream)?)
+                }
+                val => panic!("expected s, o, f, c or t ident, got {}", val),
+            }
         }
 
         Ok(Self {
@@ -570,6 +578,10 @@ unimplemented!("transform rules have not been implemented yet"),
 impl CommandStack {
     pub fn take_rules(&mut self) -> Rules {
         std::mem::take(&mut self.rules)
+    }
+
+    pub fn take_attrs(&mut self) -> Attributes {
+        std::mem::take(&mut self.attrs)
     }
 
     pub fn take_aliases(&mut self) -> Aliases {

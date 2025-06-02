@@ -52,7 +52,7 @@ impl From<ResolveCrate> for ReadHelp {
 }
 
 impl ReadHelp {
-    fn into_table(self) -> toml::Table {
+    pub fn into_table(self) -> toml::Table {
         self.help.parse::<toml::Table>().unwrap()
     }
 }

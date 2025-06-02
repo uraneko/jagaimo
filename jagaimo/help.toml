@@ -1,22 +1,27 @@
-[main]
-description = "brief description of the cli tool"
+[descriptions]
+root = "brief description of the cli tool"
+history = "then another for the history space"
+all.add = "description for the add operation when it is called from any space, including root"
 
 [links]
-issue_tracker = "https://www.github.com/uraneko/jagaimo/issues"
-src_code = "https://www.github.com/uraneko/jagaimo"
-website = "???"
-
-[links.extra]
-github = "https://www.github.com/uraneko"
+root.issues = "https://www.github.com/uraneko/jagaimo/issues"
+root.repo = "https://www.github.com/uraneko/jagaimo"
+root.website = "???"
+collections.issues = "https://www.github.com/uraneko/jagaimo/issues"
+root.github = "https://www.github.com/uraneko"
 
 [spaces]
 collections = "operations for managing collections"
+history = "history operations"
 
 [operations]
-"*.add" = "create a new item and add it to existing group"
+root.add = "create a new item and add it to existing group"
 
 # this superseed the above general description for the add ope when the space is collections 
 collections.add = "add a new collection to the collections database"
+collections.list = "list all the saved up collections"
+
+history.view = "view all the history registries"
 
 [flags]
 root.size = "specify the size of the item"

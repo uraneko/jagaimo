@@ -10,7 +10,7 @@ use std::collections::HashMap;
 // struct itself
 
 pub struct Help {
-    main: Main,
+    root: Main,
     links: Links,
     tokens: HashMap<String, String>,
     spaces: Spaces,
