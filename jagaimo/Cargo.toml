@@ -1,0 +1,11 @@
+[package]
+name = "jagaimo"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "dev"
+path = "src/main.rs"
+
+[dependencies]
+jagaimo_macro = { path = "../jagaimo_macro" }
