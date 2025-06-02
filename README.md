@@ -31,9 +31,7 @@ for more on this, head to <a href="examples"></a>
 
 
 #### Benchmarks 
-| bench | lex | parse | 
-| --:-- | -:- | --:-- |
-| auto gen and sed bench results here from the cargo bench command |
+
 
 #### License 
 Licensed under <a href = "LICENSE">MIT</a>

@@ -4,13 +4,12 @@ jagaimo! {
     #[
         no_help,
         no_version,
-        branch_off_root,
         nu_cmp,
         fish_cmp,
         root_name = "jagaimo_oishii_desu",
         // ignore_naming_conventions,
         // no_auto_alias,
-        disable_derives(Debug, Clone),
+        derives(Debug, Clone),
     ]
 
     o(add) = A
