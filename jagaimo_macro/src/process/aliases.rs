@@ -1,4 +1,3 @@
-use super::{CommandToken, TokenizedCommand};
 use crate::parse::alias_token;
 use crate::parse::{AliasToken, Aliased, Aliases, CommandRule, CommandStack, Rules};
 use syn::Ident;
@@ -6,10 +5,6 @@ use syn::Ident;
 impl CommandStack {
     // generates aliases when auto alias is on
     pub fn generate_auto_aliases(&mut self) {
-        if !self.attrs().auto_alias() {
-            return;
-        }
-
         let mut als = std::mem::take(self.aliases_mut());
         let cmds = self.rules_ref().commands();
         cmds.iter().for_each(|cr| {
@@ -28,9 +23,18 @@ impl CommandStack {
         self.set_aliases(&mut als);
     }
 
+    // removes manual aliases from the aliases
+    //
+    // I dont get what I wrote this for
+    // this method just returns an empty vec all the time
     pub fn resolve_aliases(&mut self) {
-        // remove command rule duplicates
-        self.rules_mut().dedup_commands();
+        // BUG
+        // when this flag is off
+        // everything breaks
+        // because aliases become empty
+        if !self.attrs().auto_alias() {
+            return;
+        }
 
         let mut als = std::mem::take(self.aliases_mut());
         als = Aliases::from_values(

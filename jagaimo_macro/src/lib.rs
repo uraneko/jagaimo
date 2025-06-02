@@ -8,12 +8,12 @@ use syn::parse_macro_input;
 
 // DOCS
 //                  command
-//  _____________________________________
-// |                                     |
-// executable space operation flags params
-// |                        | |          |
-// ---------------------------------------
-//             scope            context
+//  _______________________________
+// |                               |
+// root space operation flags params
+// |                  | |          |
+// ---------------------------------
+//        scope           context
 
 mod generate;
 mod parse;
@@ -21,56 +21,45 @@ mod process;
 mod resolve_crate;
 
 use parse::{CommandStack, Rules};
-
-// BUG
-// error: expected identifier, found `,`
-//   --> jagaimo/src/lib.rs:3:1
-//    |
-// 3  | / jagaimo! {
-// 4  | |     #[
-// 5  | |         no_help,
-// 6  | |         no_version,
-// ...  |
-// 29 | | }
-//    | | ^
-//    | | |
-//    | |_expected identifier
-//    |   while parsing this struct
-//    |
-//    = note: this error originates in the macro `jagaimo` (in Nightly builds, run with -Z macro-backtrace for more info)
-//
-// the macro generated structs look normal upon expansion and they compile safely in a playground
-// this is not a macro parsing problem as the macro parses and generates code as intended
-// this is a compiler parsing problem. the compiler cant accepet some of the macro input; it
-// doesn't lex into proper rust tokens
+use process::TypeTreeStack;
+use process::parse_help::extract_from_tables;
 
 #[proc_macro]
 pub fn jagaimo(input: TS) -> TS {
     // panic!("{:#?}", input);
-    let mut ct: CommandStack = parse_macro_input!(input);
+    let mut cs: CommandStack = parse_macro_input!(input);
+
+    // TODO auto generate help toml file
+    // user only has to input values
+    // if let Ok(false) = std::fs::exists("pleh.toml") {
+    //     std::fs::File::create_new("pleh.toml").unwrap();
+    //     panic!("jagaimo panic");
+    // }
 
     // NOTE print commands
-    // let rules = ct.rules_ref();
+    // let rules = cs.rules_ref();
     // for c in rules.commands() {
     //     println!("{}", c);
     // }
 
-    // NOTE type tree generation
-    let name = ct.attrs().root_name();
-    let res = ct
-        .rules_ref()
-        .generate_type_tree(&Ident::new(name, Span::call_site()));
-    println!("{}", res);
-
-    res.into()
-
     // NOTE tokenizes the commands and injects aliases to tokens
-    // ct.resolve_aliases();
-    // let cmds = ct.tokenize_commands();
+    let mut tts = TypeTreeStack::from_cmd_stack(cs);
     // println!("{:#?}", cmds);
+
+    // NOTE type tree generation
+
+    tts.generate_type_tree().into()
+
+    // TODO will have to make the type tree generation happen from the tokenized commands
+    // since both help and parse need the aliases that are injected into the tokenized command
+    // and both features are based upon the type tree
+    // so type tree must have the aliases
 
     // NOTE once the type tree is done
     // i can make the parse fn from the tokens
+
+    // read toml help file
+    // extract_from_tables();
 
     // quote! {}.into()
 }

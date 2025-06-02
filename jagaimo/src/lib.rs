@@ -9,7 +9,7 @@ jagaimo! {
         fish_cmp,
         root_name = "jagaimo_oishii_desu",
         // ignore_naming_conventions,
-        no_auto_alias,
+        // no_auto_alias,
         disable_derives(Debug, Clone),
     ]
 

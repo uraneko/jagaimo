@@ -11,7 +11,7 @@ use super::context::Context;
 use super::context::Flag;
 use super::extract_scope_items;
 use super::scope::Scope;
-use crate::process::CommandToken;
+use crate::process::tokenized_commands::CommandToken;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct CommandRule {

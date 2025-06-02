@@ -6,50 +6,47 @@ use quote::quote;
 use syn::{Ident, Type};
 
 use super::capitalize_ident;
+use super::tokenized_commands::{CommandToken, TokenizedCommand};
 use crate::parse::flags::Flag;
 use crate::parse::scope::Scope;
-use crate::parse::{CommandRule, Rules};
+use crate::parse::{Attributes, CommandStack};
 
-impl Rules {
-    pub fn generate_root(&self, name: &str) -> TS2 {
-        let mut cmds = self.commands();
+pub struct TypeTreeStack {
+    attrs: Attributes,
+    tt: TypeTree,
+    cmds: Vec<TokenizedCommand>,
+}
 
-        let mut space_variants = self.space_variants();
-        let mut non_space_variants = self.non_space_variants();
+impl TypeTreeStack {
+    pub fn from_cmd_stack(mut cs: CommandStack) -> Self {
+        let cmds = cs.tokenize_commands();
+        let attrs = cs.take_attrs();
+        let name = Ident::new(attrs.root_name(), Span::call_site());
+        let tt = TypeTree::from_commands(&name, &cmds);
 
-        let space_len = space_variants.len();
-        let non_space_len = non_space_variants.len();
-        let variant_count = space_len + non_space_len;
-
-        let mut variants = space_variants
-            .into_iter()
-            .map(|v| Ident::new(&v, Span::call_site()))
-            .chain(non_space_variants)
-            .map(|i| {
-                let i = capitalize_ident(&i);
-                quote! {
-                    #i (#i)
-                }
-            });
-
-        let name = Ident::new(name, Span::call_site());
-        match variant_count {
-            1 => {
-                let ident = variants.next().unwrap();
-                quote! { struct #name ( #ident ); }
-            }
-            len => quote! { enum #name { #(#variants,)* } },
-        }
+        Self { attrs, cmds, tt }
     }
 
-    pub fn generate_type_tree(&self, name: &Ident) -> TS2 {
-        let tt = TypeTree::from_commands(name, self.commands());
+    pub fn root_name(&self) -> Ident {
+        Ident::new(self.attrs.root_name(), Span::call_site())
+    }
+
+    pub fn commands(&self) -> &[TokenizedCommand] {
+        &self.cmds
+    }
+
+    pub fn tt(&self) -> &TypeTree {
+        &self.tt
+    }
+
+    pub fn generate_type_tree(&self) -> TS2 {
+        let tt = self.tt();
         let (root, spaces, ops) = (
-            self.generate_root_type(tt.root),
-            tt.spaces
+            self.generate_root_type(tt.root()),
+            tt.spaces()
                 .into_iter()
                 .map(|space| self.generate_space_type(space)),
-            tt.ops.into_iter().map(|op| Self::generate_op_type(op)),
+            tt.ops().into_iter().map(|op| Self::generate_op_type(op)),
         );
 
         quote! {
@@ -61,16 +58,16 @@ impl Rules {
         }
     }
 
-    pub fn generate_root_type(&self, r: GenerateRoot) -> TS2 {
-        let ident = r.name;
-        let variants = r.variants;
+    pub fn generate_root_type(&self, r: &GenerateRoot) -> TS2 {
+        let ident = r.name();
+        let variants = r.variants();
         let mut anon = TypeTree::generate_root_anon(self.commands())
-            .map(|cr| {
-                let mut cr = cr.clone();
-                TypeTree::make_anon_op(&mut cr, ident.to_string());
-                cr
+            .map(|cmd| {
+                let mut cmd = cmd.clone();
+                TypeTree::make_anon_op(&mut cmd, ident.to_string());
+                cmd
             })
-            .map(|cr| Self::generate_op_type(TypeTree::generate_op(&cr).unwrap()));
+            .map(|cmd| Self::generate_op_type(&TypeTree::generate_op(&cmd).unwrap()));
 
         if variants.len() == 1 {
             let variant = variants.into_iter().next().unwrap();
@@ -86,16 +83,16 @@ impl Rules {
         }
     }
 
-    pub fn generate_space_type(&self, s: GenerateSpace) -> TS2 {
-        let ident = s.ident;
-        let variants = s.variants;
+    pub fn generate_space_type(&self, s: &GenerateSpace) -> TS2 {
+        let ident = s.ident();
+        let variants = s.variants();
         let mut anon = TypeTree::generate_space_anon(&ident, self.commands())
-            .map(|cr| {
-                let mut cr = cr.clone();
-                TypeTree::make_anon_op(&mut cr, ident.to_string());
-                cr
+            .map(|cmd| {
+                let mut cmd = cmd.clone();
+                TypeTree::make_anon_op(&mut cmd, ident.to_string());
+                cmd
             })
-            .map(|cr| Self::generate_op_type(TypeTree::generate_op(&cr).unwrap()));
+            .map(|cmd| Self::generate_op_type(&TypeTree::generate_op(&cmd).unwrap()));
 
         if variants.len() == 1 {
             let variant = variants.into_iter().next().unwrap();
@@ -111,11 +108,11 @@ impl Rules {
         }
     }
 
-    pub fn generate_op_type(o: GenerateOp) -> TS2 {
-        let ident = o.ident;
-        let params = o.params.map(|ty| quote! { params: #ty });
+    pub fn generate_op_type(o: &GenerateOp) -> TS2 {
+        let ident = o.ident();
+        let params = o.params().map(|ty| quote! { params: #ty });
         let fields = o
-            .fields
+            .fields()
             .map(|flags| {
                 flags.into_iter().map(|f| match f {
                     Flag::Bool(i) => quote! { #i: bool  },
@@ -139,6 +136,16 @@ pub struct GenerateSpace {
     variants: Vec<Ident>,
 }
 
+impl GenerateSpace {
+    fn ident(&self) -> &Ident {
+        &self.ident
+    }
+
+    fn variants(&self) -> &[Ident] {
+        &self.variants
+    }
+}
+
 #[derive(Debug)]
 pub struct GenerateOp {
     scope: Scope,
@@ -147,10 +154,44 @@ pub struct GenerateOp {
     ident: Ident,
 }
 
+impl GenerateOp {
+    fn scope(&self) -> &Scope {
+        &self.scope
+    }
+
+    fn fields(&self) -> Option<&[Flag]> {
+        self.fields.as_ref().map(|v| v.as_slice())
+    }
+
+    fn params(&self) -> Option<&Type> {
+        self.params.as_ref()
+    }
+
+    fn ident(&self) -> &Ident {
+        &self.ident
+    }
+}
+
 #[derive(Debug)]
 pub struct GenerateRoot {
     name: Ident,
     variants: Vec<Ident>,
+}
+
+impl GenerateRoot {
+    fn name(&self) -> &Ident {
+        &self.name
+    }
+
+    fn variants(&self) -> &[Ident] {
+        &self.variants
+    }
+}
+
+impl GenerateRoot {
+    pub fn ident_to_string(&self) -> String {
+        self.name.to_string()
+    }
 }
 
 #[derive(Debug)]
@@ -161,7 +202,21 @@ pub struct TypeTree {
 }
 
 impl TypeTree {
-    fn from_commands(name: &Ident, cmds: &[CommandRule]) -> Self {
+    pub fn spaces(&self) -> &[GenerateSpace] {
+        &self.spaces
+    }
+
+    pub fn ops(&self) -> &[GenerateOp] {
+        &self.ops
+    }
+
+    pub fn root(&self) -> &GenerateRoot {
+        &self.root
+    }
+}
+
+impl TypeTree {
+    fn from_commands(name: &Ident, cmds: &[TokenizedCommand]) -> Self {
         let ops = Self::generate_ops(cmds);
         let spaces: Vec<_> = Self::generate_spaces(&ops, cmds).collect();
         let root = Self::generate_root(name, cmds, &ops, &spaces);
@@ -169,7 +224,7 @@ impl TypeTree {
     }
 
     // generates all the op types
-    fn generate_ops(cmds: &[CommandRule]) -> Vec<GenerateOp> {
+    fn generate_ops(cmds: &[TokenizedCommand]) -> Vec<GenerateOp> {
         cmds.into_iter()
             .map(|cmd| Self::generate_op(cmd))
             .filter(|go| go.is_some())
@@ -178,25 +233,27 @@ impl TypeTree {
     }
 
     // generates an op type from a command if the command has one
-    fn generate_op(cmd: &CommandRule) -> Option<GenerateOp> {
+    fn generate_op(cmd: &TokenizedCommand) -> Option<GenerateOp> {
         if let Some(o) = cmd.op() {
             return Some(GenerateOp {
                 scope: cmd
                     .space()
+                    .map(|s| s.ident().unwrap())
                     .map(|s| Scope::Space(s.clone()))
                     .unwrap_or(Scope::Root),
-                fields: cmd.flags().map(|f| f.to_vec()),
-                params: cmd.params().cloned(),
-                ident: capitalize_ident(o),
+                fields: cmd.flags2().map(|f| f.to_vec()),
+
+                params: cmd.params().map(|p| p.ty().unwrap().clone()),
+
+                ident: capitalize_ident(o.ident().unwrap()),
             });
         }
-
         None
     }
 
-    fn generate_root_anon(cmds: &[CommandRule]) -> Option<&CommandRule> {
+    fn generate_root_anon(cmds: &[TokenizedCommand]) -> Option<&TokenizedCommand> {
         cmds.into_iter()
-            .find(|cr| cr.space().is_none() && cr.op().is_none())
+            .find(|cmd| cmd.space().is_none() && cmd.op().is_none())
     }
 
     fn generate_root_ops(ops: &[GenerateOp]) -> impl Iterator<Item = &GenerateOp> {
@@ -205,7 +262,7 @@ impl TypeTree {
 
     fn generate_root(
         name: &Ident,
-        cmds: &[CommandRule],
+        cmds: &[TokenizedCommand],
         ops: &[GenerateOp],
         spaces: &[GenerateSpace],
     ) -> GenerateRoot {
@@ -225,23 +282,23 @@ impl TypeTree {
         }
     }
 
-    fn make_anon_op(cmd: &mut CommandRule, ident: String) {
+    fn make_anon_op(cmd: &mut TokenizedCommand, ident: String) {
         let i = Ident::new(&(ident + "Anon"), Span::call_site());
-        cmd.set_op(i);
+        cmd.set_op(CommandToken::new_op(i));
     }
 
     fn generate_space_anon<'a>(
         ident: &'a Ident,
-        cmds: &'a [CommandRule],
-    ) -> Option<&'a CommandRule> {
+        cmds: &'a [TokenizedCommand],
+    ) -> Option<&'a TokenizedCommand> {
         cmds.into_iter()
-            .find(|cr| cr.space() == Some(ident) && cr.op().is_none())
+            .find(|cmd| cmd.space_matches(ident) && cmd.op().is_none())
     }
 
     // generates space types from the generated op types
     fn generate_spaces(
         ops: &[GenerateOp],
-        cmds: &[CommandRule],
+        cmds: &[TokenizedCommand],
     ) -> impl Iterator<Item = GenerateSpace> {
         ops.chunk_by(|a, b| a.scope == b.scope).map(|s| {
             let ident = capitalize_ident(&s[0].scope.space().unwrap().clone());
