@@ -10,7 +10,7 @@ pub enum Scope {
     Operation(Ident),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AliasScope {
     // a space
     S,
@@ -18,6 +18,14 @@ pub enum AliasScope {
     O,
     // a flag
     F,
+}
+
+impl AliasScope {
+    pub fn is_space(&self) -> bool {
+        let Self::S = self else { return false };
+
+        true
+    }
 }
 
 impl TryFrom<Ident> for AliasScope {

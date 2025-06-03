@@ -1,3 +1,5 @@
+use std::hash::{Hash, Hasher};
+
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::Token;
@@ -8,12 +10,45 @@ use syn::{Ident, Type};
 use syn::{braced, bracketed, parenthesized};
 
 use super::{AliasScope, Flag};
+use crate::output::alias_generation::AliasGenerator;
 
 #[derive(Debug, Default)]
 pub struct Rules {
     alias: Vec<AliasRule>,
     cmd: Vec<CommandRule>,
     trnsf: Vec<TransformRule>,
+}
+
+impl Rules {
+    pub fn cmd_ref(&self) -> &[CommandRule] {
+        &self.cmd
+    }
+
+    pub fn cmd_mut(&mut self) -> &Vec<CommandRule> {
+        &mut self.cmd
+    }
+
+    pub fn alias_ref(&self) -> &[AliasRule] {
+        &self.alias
+    }
+
+    pub fn alias_mut(&mut self) -> &mut Vec<AliasRule> {
+        &mut self.alias
+    }
+}
+
+impl Rules {
+    pub fn alias_generator(&mut self, auto_alias: bool) {
+        if !auto_alias {
+            return;
+        }
+
+        let mut alias = std::mem::take(self.alias_mut());
+        let mut alias_gen = AliasGenerator::new(&mut alias, self.cmd_ref());
+        alias_gen.generate_aliases();
+
+        self.alias = std::mem::take(&mut alias);
+    }
 }
 
 impl Parse for Rules {
@@ -53,11 +88,42 @@ impl Parse for Rules {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Eq)]
 pub struct AliasRule {
     scoped: AliasScope,
     token: Ident,
     alias: Ident,
+}
+
+impl Hash for AliasRule {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.scoped.hash(state);
+        self.token.hash(state);
+    }
+}
+
+impl PartialEq for AliasRule {
+    fn eq(&self, other: &Self) -> bool {
+        self.token == other.token && self.scoped == other.scoped
+    }
+}
+
+impl AliasRule {
+    pub fn new(scoped: AliasScope, token: Ident, alias: Ident) -> Self {
+        Self {
+            scoped,
+            token,
+            alias,
+        }
+    }
+
+    pub fn scope(&self) -> &AliasScope {
+        &self.scoped
+    }
+
+    pub fn token(&self) -> &Ident {
+        &self.token
+    }
 }
 
 impl Parse for AliasRule {
@@ -77,6 +143,12 @@ impl Parse for AliasRule {
     }
 }
 
+impl std::fmt::Display for AliasRule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}:{} -> {}", self.scope(), self.token(), self.alias)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct TransformRule {}
 
@@ -86,12 +158,44 @@ impl Parse for TransformRule {
     }
 }
 
+// TODO
+// deduplication of rules
 #[derive(Debug, Default)]
 pub struct CommandRule {
     space: Option<Ident>,
     op: Option<Ident>,
     flags: Option<Vec<Flag>>,
     params: Option<Type>,
+}
+
+impl CommandRule {
+    pub fn contains_space(&self) -> bool {
+        self.space.is_some()
+    }
+
+    pub fn contains_op(&self) -> bool {
+        self.op.is_some()
+    }
+
+    pub fn contains_flags(&self) -> bool {
+        self.flags.is_some()
+    }
+}
+
+impl CommandRule {
+    pub fn flags(&self) -> Option<&[Flag]> {
+        self.flags.as_ref().map(|flags| flags.as_slice())
+    }
+}
+
+impl CommandRule {
+    pub fn space_cloned(&self) -> Option<Ident> {
+        self.space.clone()
+    }
+
+    pub fn op_cloned(&self) -> Option<Ident> {
+        self.op.clone()
+    }
 }
 
 #[derive(Debug)]
@@ -198,26 +302,23 @@ impl std::fmt::Display for CommandRule {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}",
-            format!(
-                "SPACE<{}> OPERATION<{}> PARAM<{}> FLAGS<{}>\n",
-                self.space
-                    .as_ref()
-                    .map(|i| i.to_string())
-                    .unwrap_or("".into()),
-                self.op.as_ref().map(|i| i.to_string()).unwrap_or("".into()),
-                self.params
-                    .as_ref()
-                    .map(|t| format!("{:?}", t.to_token_stream().to_string()))
-                    .unwrap_or("".into()),
-                self.flags
-                    .as_ref()
-                    .map(|f| f
-                        .into_iter()
-                        .map(|f| f.to_string())
-                        .fold(String::new(), |acc, f| acc + &f + " "))
-                    .unwrap_or("".into()),
-            )
+            "SPACE<{}> OPERATION<{}> PARAM<{}> FLAGS<{}>\n",
+            self.space
+                .as_ref()
+                .map(|i| i.to_string())
+                .unwrap_or("".into()),
+            self.op.as_ref().map(|i| i.to_string()).unwrap_or("".into()),
+            self.params
+                .as_ref()
+                .map(|t| format!("{:?}", t.to_token_stream().to_string()))
+                .unwrap_or("".into()),
+            self.flags
+                .as_ref()
+                .map(|f| f
+                    .into_iter()
+                    .map(|f| f.to_string())
+                    .fold(String::new(), |acc, f| acc + &f + " "))
+                .unwrap_or("".into()),
         )
     }
 }

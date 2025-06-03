@@ -8,7 +8,7 @@ pub mod scope;
 
 pub use attrs::Attrs;
 pub use flags::Flag;
-pub use rules::Rules;
+pub use rules::{AliasRule, CommandRule, Rules};
 pub use scope::AliasScope;
 
 pub type MacroInput = (Attrs, Rules);
