@@ -10,8 +10,8 @@ use syn::{Ident, Type};
 use syn::{braced, bracketed, parenthesized};
 
 use super::{AliasScope, Flag};
-use crate::output::alias_generation::AliasGenerator;
-use crate::output::commands_tokenizer::{AliasLookup, TokenizedCommand};
+use crate::output::AliasGenerator;
+use crate::output::{AliasLookup, TokenizedCommand};
 
 #[derive(Debug, Default)]
 pub struct Rules {

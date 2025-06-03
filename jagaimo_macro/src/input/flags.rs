@@ -3,7 +3,7 @@ use syn::Token;
 use syn::parse::{Parse, ParseStream, Parser, Result as PRes};
 use syn::{Ident, Type};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Flag {
     Bool(Ident),
     Parameterized { ident: Ident, ty: Type },

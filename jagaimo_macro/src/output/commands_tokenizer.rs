@@ -144,7 +144,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AliasedToken<'a> {
     Space {
         token: &'a Ident,
@@ -163,12 +163,60 @@ pub enum AliasedToken<'a> {
     Params(&'a Type),
 }
 
+impl<'a> AliasedToken<'a> {
+    pub fn new_op(ident: &'a Ident) -> Self {
+        Self::Operation {
+            token: ident,
+            alias: None,
+        }
+    }
+
+    pub fn is_space(&self) -> bool {
+        let Self::Space { .. } = self else {
+            return false;
+        };
+
+        true
+    }
+
+    pub fn ident(&self) -> Option<&'a Ident> {
+        match self {
+            Self::Space { token, .. } | Self::Operation { token, .. } => Some(token),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct TokenizedCommand<'a> {
     space: Option<AliasedToken<'a>>,
     op: Option<AliasedToken<'a>>,
     flags: Option<Vec<AliasedToken<'a>>>,
     params: Option<AliasedToken<'a>>,
+}
+
+impl TokenizedCommand<'_> {
+    pub fn is_space_op(&self) -> bool {
+        self.space.is_some() && self.op.is_some()
+    }
+
+    pub fn is_op(&self) -> bool {
+        self.op.is_some() && self.space.is_none()
+    }
+
+    pub fn is_space(&self) -> bool {
+        self.op.is_none() && self.space.is_some()
+    }
+}
+
+impl<'a> TokenizedCommand<'a> {
+    pub fn space(&self) -> Option<AliasedToken<'a>> {
+        self.space.clone()
+    }
+
+    pub fn op(&self) -> Option<AliasedToken<'a>> {
+        self.op.clone()
+    }
 }
 
 impl<'a> From<AliasLookup<'a>> for TokenizedCommand<'a> {
