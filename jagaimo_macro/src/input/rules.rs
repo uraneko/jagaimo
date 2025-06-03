@@ -274,7 +274,12 @@ pub fn extract_scope_tokens(s: ParseStream) -> PRes<Vec<Ident>> {
 impl ExpandedCommandRule {
     fn new(spaces: Vec<Ident>, ops: Vec<Ident>, flags: Vec<Flag>, params: Option<Type>) -> Self {
         Self(match [spaces.is_empty(), ops.is_empty()] {
-            [true, true] => vec![CommandRule::default()],
+            [true, true] => vec![CommandRule {
+                flags: Some(flags),
+                params,
+                space: None,
+                op: None,
+            }],
             [true, false] => ops
                 .into_iter()
                 .map(|o| CommandRule {
