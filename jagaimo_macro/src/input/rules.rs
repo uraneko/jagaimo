@@ -236,18 +236,18 @@ pub struct ExpandedCommandRule(Vec<CommandRule>);
 
 fn extract_context_tokens(s: ParseStream) -> PRes<(Vec<Flag>, Option<Type>)> {
     let mut f = vec![];
-    let mut p = None;
+    let p = if s.peek(Token![<]) {
+        _ = <Token![<]>::parse(s)?;
+        let p = Type::parse(s)?;
+        _ = <Token![>]>::parse(s)?;
+
+        Some(p)
+    } else {
+        None
+    };
 
     while !s.is_empty() {
-        // flag
-        if s.peek(Ident::peek_any) {
-            f.push(Flag::parse(s)?);
-        // param
-        } else {
-            _ = <Token![<]>::parse(s)?;
-            p = Type::parse(s).ok();
-            _ = <Token![>]>::parse(s)?;
-        }
+        f.push(Flag::parse(s)?);
     }
 
     Ok((f, p))
