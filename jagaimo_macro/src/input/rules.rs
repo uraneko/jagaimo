@@ -11,6 +11,7 @@ use syn::{braced, bracketed, parenthesized};
 
 use super::{AliasScope, Flag};
 use crate::output::alias_generation::AliasGenerator;
+use crate::output::commands_tokenizer::{AliasLookup, TokenizedCommand};
 
 #[derive(Debug, Default)]
 pub struct Rules {
@@ -24,7 +25,7 @@ impl Rules {
         &self.cmd
     }
 
-    pub fn cmd_mut(&mut self) -> &Vec<CommandRule> {
+    pub fn cmd_mut(&mut self) -> &mut Vec<CommandRule> {
         &mut self.cmd
     }
 
@@ -48,6 +49,16 @@ impl Rules {
         alias_gen.generate_aliases();
 
         self.alias = std::mem::take(&mut alias);
+    }
+}
+
+impl Rules {
+    pub fn cmds_tokenizer(&self) -> Vec<TokenizedCommand> {
+        self.cmd
+            .iter()
+            .map(|cmd| AliasLookup::new(cmd, &self.alias))
+            .map(|al| al.lookup())
+            .collect()
     }
 }
 
@@ -124,6 +135,10 @@ impl AliasRule {
     pub fn token(&self) -> &Ident {
         &self.token
     }
+
+    pub fn alias(&self) -> &Ident {
+        &self.alias
+    }
 }
 
 impl Parse for AliasRule {
@@ -160,7 +175,7 @@ impl Parse for TransformRule {
 
 // TODO
 // deduplication of rules
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct CommandRule {
     space: Option<Ident>,
     op: Option<Ident>,
@@ -183,8 +198,26 @@ impl CommandRule {
 }
 
 impl CommandRule {
+    pub fn space(&self) -> Option<&Ident> {
+        self.space.as_ref()
+    }
+
+    pub fn op(&self) -> Option<&Ident> {
+        self.op.as_ref()
+    }
+
     pub fn flags(&self) -> Option<&[Flag]> {
         self.flags.as_ref().map(|flags| flags.as_slice())
+    }
+
+    pub fn flags_idents(&self) -> Option<Vec<&Ident>> {
+        self.flags
+            .as_ref()
+            .map(|f| f.into_iter().map(|f| f.ident()).collect())
+    }
+
+    pub fn params(&self) -> Option<&Type> {
+        self.params.as_ref()
     }
 }
 

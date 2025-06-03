@@ -10,7 +10,7 @@ pub enum Scope {
     Operation(Ident),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
 pub enum AliasScope {
     // a space
     S,

@@ -55,7 +55,7 @@ fn alias_exists(alias: &[AliasRule], scope: &AliasScope, token: &Ident) -> bool 
 fn make_alias(scoped: AliasScope, token: Ident) -> Option<AliasRule> {
     let s = token.to_string();
     let len = s.len();
-    let alen = if len <= 4 {
+    let alen = if len <= 3 {
         0
     } else if scoped.is_space() {
         4
