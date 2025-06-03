@@ -109,13 +109,13 @@ pub struct AliasRule {
 impl Hash for AliasRule {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.scoped.hash(state);
-        self.token.hash(state);
+        self.alias.hash(state);
     }
 }
 
 impl PartialEq for AliasRule {
     fn eq(&self, other: &Self) -> bool {
-        self.token == other.token && self.scoped == other.scoped
+        self.alias == other.alias && self.scoped == other.scoped
     }
 }
 

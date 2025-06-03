@@ -8,6 +8,12 @@ mod resolve_crate;
 use input::parse_attrs_rules;
 use output::alias_generation::AliasGenerator;
 
+// BUG
+// declaring a bool flag before declaring a param in a command rule
+// make the param into the type of the bool flag
+// and results in a command without params
+//
+
 #[proc_macro]
 pub fn jagaimo(stream: TokenStream) -> TokenStream {
     // set parser fn that impl Parser trait
