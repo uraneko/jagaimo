@@ -33,6 +33,12 @@ pub struct Attrs {
     derives: Vec<Ident>,
 }
 
+impl Attrs {
+    pub fn auto_alias(&self) -> bool {
+        self.auto_alias
+    }
+}
+
 impl Default for Attrs {
     fn default() -> Self {
         Self {

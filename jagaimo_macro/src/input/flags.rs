@@ -9,6 +9,15 @@ pub enum Flag {
     Parameterized { ident: Ident, ty: Type },
 }
 
+impl Flag {
+    pub fn ident(&self) -> &Ident {
+        match self {
+            Self::Bool(i) => i,
+            Self::Parameterized { ident, .. } => ident,
+        }
+    }
+}
+
 impl Parse for Flag {
     fn parse(s: ParseStream<'_>) -> PRes<Self> {
         let ident = Ident::parse(s)?;
@@ -37,7 +46,7 @@ impl std::fmt::Display for Flag {
             match self {
                 Self::Bool(i) => format!("{}", i),
                 Self::Parameterized { ident, ty } =>
-                    format!("{}<>{}", ident, ty.to_token_stream().to_string()),
+                    format!("{}<{}>", ident, ty.to_token_stream().to_string()),
             }
         )
     }
