@@ -34,12 +34,12 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
     }
 
     // auto generate additional alias rules if necessary
-    // rules.alias_generator(attrs.auto_alias());
+    rules.alias_generator(attrs.auto_alias());
 
     // print all alias rules
-    // for al in rules.alias_ref() {
-    //     println!("{}", al);
-    // }
+    for al in rules.alias_ref() {
+        println!("{}", al);
+    }
 
     println!();
 

@@ -19,6 +19,10 @@ impl<'a> AliasGenerator<'a> {
     }
 
     pub fn generate_aliases(&mut self) {
+        // get rid of invalid aliases
+        // ie. aliases written for tokens that dont exist in any command rule
+        self.resolve_hand_written();
+
         self.cmd.into_iter().for_each(|cr| {
             let space = space_alias(&self.alias, cr);
             let op = op_alias(&self.alias, cr);
@@ -34,6 +38,23 @@ impl<'a> AliasGenerator<'a> {
                 self.extend_alias(ars.into_iter());
             }
         });
+    }
+
+    // NOTE use this before generate_aliases to
+    // remove invalid aliases and duplicates
+    fn resolve_hand_written(&mut self) {
+        let alias = std::mem::take(self.alias);
+        self.alias
+            .extend(alias.into_iter().filter(|a| match a.scope() {
+                AliasScope::S => self.cmd.iter().any(|cr| cr.space() == a.token()),
+                AliasScope::O => self.cmd.iter().any(|cr| cr.op() == a.token()),
+                AliasScope::F => self.cmd.iter().any(|cr| {
+                    let Some(flags) = cr.flags_idents() else {
+                        return false;
+                    };
+                    flags.contains(&a.token())
+                }),
+            }));
     }
 
     fn push_alias(&mut self, ar: AliasRule) {

@@ -96,11 +96,6 @@ pub struct ExpandingCommandRule {
     params: Option<Type>,
 }
 
-// TODO make ExpandingCommandRule take a hashset
-// and impl hash and partial eq for UnresolvedCommnadRule
-// comparing only space and operation equality
-// this will give us command rule dedup
-
 fn extract_context_tokens(s: ParseStream) -> PRes<(Vec<Flag>, Option<Type>)> {
     let mut f = HashSet::new();
     let p = if s.peek(Token![<]) {
