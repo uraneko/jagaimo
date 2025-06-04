@@ -17,7 +17,7 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
 
     // parse input into attrs and rules
     // panic out if error
-    let Ok((attrs, mut rules)) = res else {
+    let Ok((attrs, rules)) = res else {
         let Err(e) = res else {
             unreachable!("result pattern refutation can not be refuted");
         };
@@ -26,7 +26,7 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
     // print the attributes
     println!("{:#?}", attrs);
 
-    let rules = rules.nameless_resolution(attrs.root_name());
+    let mut rules = rules.nameless_resolution(attrs.root_name());
 
     // print the command rules
     for cmd in rules.cmd_ref() {

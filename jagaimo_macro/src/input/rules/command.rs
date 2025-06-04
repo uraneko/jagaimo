@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 
 use proc_macro2::Span;
@@ -13,7 +14,7 @@ use super::{AliasScope, Flag};
 
 // TODO
 // deduplication of rules
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq)]
 pub struct CommandRule {
     space: Ident,
     nameless_space: bool,
@@ -23,16 +24,19 @@ pub struct CommandRule {
     params: Option<Type>,
 }
 
-impl Default for CommandRule {
-    fn default() -> Self {
-        Self {
-            space: Ident::new("", Span::call_site()),
-            op: Ident::new("", Span::call_site()),
-            nameless_op: false,
-            nameless_space: false,
-            flags: None,
-            params: None,
-        }
+// WARN 2 command rules that have the same scope (space and op)
+// should be considered equal reagrdless of their context
+
+impl Hash for CommandRule {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.space.hash(state);
+        self.op.hash(state);
+    }
+}
+
+impl PartialEq for CommandRule {
+    fn eq(&self, other: &Self) -> bool {
+        self.space == other.space && self.op == other.op
     }
 }
 
@@ -98,7 +102,7 @@ pub struct ExpandingCommandRule {
 // this will give us command rule dedup
 
 fn extract_context_tokens(s: ParseStream) -> PRes<(Vec<Flag>, Option<Type>)> {
-    let mut f = vec![];
+    let mut f = HashSet::new();
     let p = if s.peek(Token![<]) {
         _ = <Token![<]>::parse(s)?;
         let p = Type::parse(s)?;
@@ -110,10 +114,10 @@ fn extract_context_tokens(s: ParseStream) -> PRes<(Vec<Flag>, Option<Type>)> {
     };
 
     while !s.is_empty() {
-        f.push(Flag::parse(s)?);
+        f.insert(Flag::parse(s)?);
     }
 
-    Ok((f, p))
+    Ok((f.into_iter().collect(), p))
 }
 
 pub fn extract_scope_tokens(s: ParseStream) -> PRes<Vec<Ident>> {

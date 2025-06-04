@@ -1,12 +1,29 @@
+use std::hash::{Hash, Hasher};
+
 use quote::ToTokens;
 use syn::Token;
 use syn::parse::{Parse, ParseStream, Parser, Result as PRes};
 use syn::{Ident, Type};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Eq)]
 pub enum Flag {
     Bool(Ident),
     Parameterized { ident: Ident, ty: Type },
+}
+
+// WARN 2 flags having the same name in the same command rule
+// should not be allowed, regardless of the flag type
+
+impl Hash for Flag {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.ident().hash(state);
+    }
+}
+
+impl PartialEq for Flag {
+    fn eq(&self, other: &Self) -> bool {
+        self.ident() == other.ident()
+    }
 }
 
 impl Flag {

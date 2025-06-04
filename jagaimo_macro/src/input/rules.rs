@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use proc_macro2::Span;
 use syn::Ident;
 use syn::parse::{Parse, ParseStream, Result as PRes};
@@ -33,6 +35,8 @@ impl RulesUnresolved {
                 .into_iter()
                 .map(|exp| exp.expand(root_name))
                 .flatten()
+                .collect::<HashSet<CommandRule>>()
+                .into_iter()
                 .collect(),
         }
     }
