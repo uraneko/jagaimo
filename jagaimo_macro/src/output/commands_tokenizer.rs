@@ -15,12 +15,12 @@ macro_rules! aliased_token {
             's' => AliasedToken::Space {
                 token: $t,
                 alias: Some($a),
-                nameless: $n,
+                bare: $n,
             },
             'o' => AliasedToken::Operation {
                 token: $t,
                 alias: Some($a),
-                nameless: $n,
+                bare: $n,
             },
             _ => panic!("macro expected 's' or 'o' as first token"),
         }
@@ -38,12 +38,12 @@ macro_rules! aliased_token {
             's' => AliasedToken::Space {
                 token: $t,
                 alias: None,
-                nameless: $n,
+                bare: $n,
             },
             'o' => AliasedToken::Operation {
                 token: $t,
                 alias: None,
-                nameless: $n,
+                bare: $n,
             },
             _ => panic!("macro expected 's', 'o' or 'f' as first token"),
         }
@@ -74,7 +74,7 @@ where
         // WARN altered for the sake expanding
         // if let Some(space) = self.cmd.space() { ...
         let space = self.cmd.space();
-        let nameless = !self.cmd.contains_space();
+        let bare = !self.cmd.contains_space();
         let atok = self
             .alias
             .into_iter()
@@ -82,10 +82,10 @@ where
         if let Some(al) = atok {
             let al = al.alias();
 
-            return aliased_token!('s', space, al, nameless);
+            return aliased_token!('s', space, al, bare);
         }
 
-        aliased_token!('s', space, nameless)
+        aliased_token!('s', space, bare)
     }
 
     // returns self.cmd's op alias value if it exists
@@ -93,7 +93,7 @@ where
         // WARN altered for the sake expanding
         // if let Some(op) = self.cmd.op() { ...
         let op = self.cmd.op();
-        let nameless = !self.cmd.contains_op();
+        let bare = !self.cmd.contains_op();
         let atok = self
             .alias
             .into_iter()
@@ -101,10 +101,10 @@ where
         if let Some(al) = atok {
             let al = al.alias();
 
-            return aliased_token!('o', op, al, nameless);
+            return aliased_token!('o', op, al, bare);
         }
 
-        aliased_token!('o', op, nameless)
+        aliased_token!('o', op, bare)
     }
 
     // returns self.cmd's flags alias values if at least one exists
@@ -151,13 +151,13 @@ pub enum AliasedToken<'a> {
     Space {
         token: &'a Ident,
         alias: Option<&'a Ident>,
-        nameless: bool,
+        bare: bool,
     },
 
     Operation {
         token: &'a Ident,
         alias: Option<&'a Ident>,
-        nameless: bool,
+        bare: bool,
     },
 
     Flag {
@@ -171,11 +171,11 @@ pub enum AliasedToken<'a> {
 }
 
 impl<'a> AliasedToken<'a> {
-    pub fn new_op(ident: &'a Ident, nameless: bool) -> Self {
+    pub fn new_op(ident: &'a Ident, bare: bool) -> Self {
         Self::Operation {
             token: ident,
             alias: None,
-            nameless,
+            bare,
         }
     }
 
@@ -187,9 +187,9 @@ impl<'a> AliasedToken<'a> {
         true
     }
 
-    pub fn is_nameless(&self) -> bool {
+    pub fn is_bare(&self) -> bool {
         match self {
-            Self::Space { nameless, .. } | Self::Operation { nameless, .. } => *nameless,
+            Self::Space { bare, .. } | Self::Operation { bare, .. } => *bare,
             _ => false,
         }
     }
@@ -243,15 +243,15 @@ pub struct TokenizedCommand<'a> {
 
 impl TokenizedCommand<'_> {
     pub fn is_space_op(&self) -> bool {
-        !self.space.is_nameless() && !self.op.is_nameless()
+        !self.space.is_bare() && !self.op.is_bare()
     }
 
     pub fn is_op(&self) -> bool {
-        self.space.is_nameless() && !self.op.is_nameless()
+        self.space.is_bare() && !self.op.is_bare()
     }
 
     pub fn is_space(&self) -> bool {
-        !self.space.is_nameless() && self.op.is_nameless()
+        !self.space.is_bare() && self.op.is_bare()
     }
 }
 
@@ -327,17 +327,8 @@ impl std::fmt::Display for AliasedToken<'_> {
             f,
             "{}",
             match self {
-                Self::Space {
-                    token,
-                    alias,
-                    nameless,
-                }
-                | Self::Operation {
-                    token,
-                    alias,
-                    nameless,
-                } =>
-                    if *nameless {
+                Self::Space { token, alias, bare } | Self::Operation { token, alias, bare } =>
+                    if *bare {
                         "".into()
                     } else {
                         format!(
@@ -370,12 +361,12 @@ impl std::fmt::Display for TokenizedCommand<'_> {
         write!(
             f,
             "S:{} O:{} F:{:?} P:{}",
-            if !self.space.is_nameless() {
+            if !self.space.is_bare() {
                 format!("{}", self.space)
             } else {
                 "".into()
             },
-            if !self.op.is_nameless() {
+            if !self.op.is_bare() {
                 format!("{}", self.op)
             } else {
                 "".into()

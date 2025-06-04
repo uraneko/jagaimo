@@ -1,4 +1,5 @@
 use proc_macro::TokenStream;
+use quote::quote;
 use syn::parse::Parser;
 
 mod input;
@@ -26,7 +27,11 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
     // print the attributes
     println!("{:#?}", attrs);
 
-    let mut rules = rules.nameless_resolution(attrs.root_name());
+    // resolve name conflicts of operations
+    // rules.resolve_ops_name_conflicts();
+
+    // resolve bare spaces and operations in command rules
+    let mut rules = rules.commands_resolution(attrs.root_name());
 
     // print the command rules
     for cmd in rules.cmd_ref() {
@@ -47,6 +52,8 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
     for tcmd in tok_cmds {
         println!("{}\n", tcmd);
     }
+
+    // quote! {}.into()
 
     rules.type_tree_renderer(attrs.root_name()).into()
 }

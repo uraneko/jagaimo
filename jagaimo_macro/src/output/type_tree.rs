@@ -14,7 +14,7 @@ pub struct TypeTree<'a> {
     ops: Vec<OpType<'a>>,
 }
 
-// TODO when nameless resolution is handled after parsing macro input
+// TODO when bare resolution is handled after parsing macro input
 // operation name conflicts should also be handled
 // i.e., given 2 command rules
 // s(history) o(view) ....
@@ -33,6 +33,17 @@ pub struct TypeTree<'a> {
 // and the unique one is renamed to space_name_op_name
 // <- this way name conflicts are avoided in the type tree
 
+// TODO need special handling for fully bare scope
+// -> if space == op
+// -> space is a redundant op name
+// there is no space but an op for the root space
+//
+// TODO spaceless operations all belong to root space
+//
+// WARN space and op names are always there because every command needs a space and op name/id for
+// its states to be reprensented
+//  but when figuring the space and op of a command
+//  the valid check is to use is_bare method on scope tokens
 impl<'a> TypeTree<'a> {
     pub fn new(tcmd: Vec<TokenizedCommand<'a>>, root_name: &str) -> Self {
         let mut iter = tcmd.into_iter();
@@ -62,11 +73,11 @@ impl<'a> TypeTree<'a> {
             //     // command is a space operation
             //     // some space's named command
             //     tc if tc.is_space_op() => {}
-            //     // command is a space nameless command
-            //     // some space's nameless command
+            //     // command is a space bare command
+            //     // some space's bare command
             //     tc if tc.is_space() => {}
-            //     // command is an nameless operation command
-            //     // root nameless command
+            //     // command is an bare operation command
+            //     // root bare command
             //     tc if tc.is_op() => {}
             //     // command is somethig else, unreachable
             //     _ => panic!(),

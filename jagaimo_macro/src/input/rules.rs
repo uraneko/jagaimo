@@ -25,7 +25,7 @@ pub struct RulesUnresolved {
 }
 
 impl RulesUnresolved {
-    pub fn nameless_resolution(self, root_name: &str) -> Rules {
+    pub fn commands_resolution(self, root_name: &str) -> Rules {
         Rules {
             alias: self.alias,
             trnsf: self.trnsf,
@@ -34,8 +34,14 @@ impl RulesUnresolved {
             cmd: self
                 .cmd
                 .into_iter()
-                .map(|exp| exp.expand(root_name))
+                .map(|mut exp| {
+                    exp.resolve_bare_scopes(root_name);
+
+                    exp.expand()
+                })
                 .flatten()
+                // here we do operations naming conflicts resolutions
+                // here we enforce naming conventions if their flag is on
                 .collect::<HashSet<CommandRule>>()
                 .into_iter()
                 .collect(),
@@ -69,6 +75,8 @@ impl Rules {
 }
 
 impl Rules {
+    pub fn resolve_operations_naming_conflicts(&mut self) {}
+
     pub fn alias_generator(&mut self, auto_alias: bool) {
         if !auto_alias {
             return;
