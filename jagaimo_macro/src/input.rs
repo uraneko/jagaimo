@@ -8,11 +8,11 @@ pub mod scope;
 
 pub use attrs::Attrs;
 pub use flags::Flag;
-pub use rules::{AliasRule, CommandRule, Rules};
+pub use rules::{AliasRule, CommandRule, Rules, RulesUnresolved};
 pub use scope::AliasScope;
 
-pub type MacroInput = (Attrs, Rules);
+pub type MacroInput = (Attrs, RulesUnresolved);
 
 pub fn parse_attrs_rules(stream: ParseStream) -> PRes<MacroInput> {
-    Ok((Attrs::parse(stream)?, Rules::parse(stream)?))
+    Ok((Attrs::parse(stream)?, RulesUnresolved::parse(stream)?))
 }

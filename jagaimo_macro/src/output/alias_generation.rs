@@ -78,7 +78,7 @@ fn space_alias(alias: &[AliasRule], cr: &CommandRule) -> Option<AliasRule> {
     if !cr.contains_space() {
         return None;
     }
-    let (scope, token) = (AliasScope::S, cr.space_cloned()?);
+    let (scope, token) = (AliasScope::S, cr.space_cloned());
     if alias_exists(alias, &scope, &token) {
         return None;
     }
@@ -90,7 +90,7 @@ fn op_alias(alias: &[AliasRule], cr: &CommandRule) -> Option<AliasRule> {
     if !cr.contains_op() {
         return None;
     }
-    let (scope, token) = (AliasScope::O, cr.op_cloned()?);
+    let (scope, token) = (AliasScope::O, cr.op_cloned());
     if alias_exists(alias, &scope, &token) {
         return None;
     }

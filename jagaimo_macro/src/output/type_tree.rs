@@ -35,12 +35,12 @@ impl TypeTree<'_> {
                 tc if tc.is_space() => {
                     let space = tc.space().unwrap();
                     let ident = space.ident().unwrap();
-                    let op = nameless_ident(&ident);
+                    // let op = nameless_ident(&ident);
 
                     if !spaces.contains(ident) {
                         spaces.register(space);
                     }
-                    spaces.update(ident, op);
+                    // spaces.update(ident, op);
                 }
                 // command is an anonymous operation command
                 tc if tc.is_op() => {}
@@ -115,11 +115,6 @@ impl<'a> TypeTreeExt<'a, OpType<'a>> for HashMap<&'a Ident, OpType<'a>> {
     fn update(&mut self, ident: &Ident, variant: AliasedToken<'a>) {
         self.get_mut(ident).map(|ot| ot.insert(variant));
     }
-}
-
-// makes a new ident for a nameless operation
-fn nameless_ident(ident: &Ident) -> Ident {
-    Ident::new(&(ident.to_string() + "Nameless"), Span::call_site())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

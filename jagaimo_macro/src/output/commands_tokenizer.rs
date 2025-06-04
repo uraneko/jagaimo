@@ -67,41 +67,43 @@ where
 
     // returns self.cmd's space alias value if it exists
     fn space_aliased(&self) -> Option<AliasedToken<'b>> {
-        if let Some(space) = self.cmd.space() {
-            let atok = self
-                .alias
-                .into_iter()
-                .find(|al| al.scope() == &AliasScope::S && al.token() == space);
-            if atok.is_some() {
-                return atok.map(|al| {
-                    let al = al.alias();
-                    aliased_token!('s', space, al)
-                });
-            }
-
-            return Some(aliased_token!('s', space));
+        // WARN altered for the sake expanding
+        // if let Some(space) = self.cmd.space() { ...
+        let space = self.cmd.space();
+        let atok = self
+            .alias
+            .into_iter()
+            .find(|al| al.scope() == &AliasScope::S && al.token() == space);
+        if atok.is_some() {
+            return atok.map(|al| {
+                let al = al.alias();
+                aliased_token!('s', space, al)
+            });
         }
+
+        return Some(aliased_token!('s', space));
 
         None
     }
 
     // returns self.cmd's op alias value if it exists
     fn op_aliased(&self) -> Option<AliasedToken<'b>> {
-        if let Some(op) = self.cmd.op() {
-            let atok = self
-                .alias
-                .into_iter()
-                .find(|al| al.scope() == &AliasScope::O && al.token() == op);
+        // WARN altered for the sake expanding
+        // if let Some(op) = self.cmd.op() { ...
+        let op = self.cmd.op();
+        let atok = self
+            .alias
+            .into_iter()
+            .find(|al| al.scope() == &AliasScope::O && al.token() == op);
 
-            if atok.is_some() {
-                return atok.map(|al| {
-                    let al = al.alias();
-                    aliased_token!('o', op, al)
-                });
-            }
-
-            return Some(aliased_token!('o', op));
+        if atok.is_some() {
+            return atok.map(|al| {
+                let al = al.alias();
+                aliased_token!('o', op, al)
+            });
         }
+
+        return Some(aliased_token!('o', op));
 
         None
     }

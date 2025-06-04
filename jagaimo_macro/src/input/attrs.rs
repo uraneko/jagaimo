@@ -34,8 +34,36 @@ pub struct Attrs {
 }
 
 impl Attrs {
+    pub fn derives(&self) -> &[Ident] {
+        &self.derives
+    }
+
+    pub fn fish_cmp(&self) -> bool {
+        self.fish_completions
+    }
+
+    pub fn nu_cmp(&self) -> bool {
+        self.nu_completions
+    }
+
+    pub fn root_name(&self) -> &str {
+        &self.root_name
+    }
+
     pub fn auto_alias(&self) -> bool {
         self.auto_alias
+    }
+
+    pub fn help(&self) -> bool {
+        self.help
+    }
+
+    pub fn version(&self) -> bool {
+        self.version
+    }
+
+    pub fn ignore_nc(&self) -> bool {
+        self.ignore_naming_conventions
     }
 }
 

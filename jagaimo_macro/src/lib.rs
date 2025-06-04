@@ -26,25 +26,27 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
     // print the attributes
     println!("{:#?}", attrs);
 
+    let rules = rules.nameless_resolution(attrs.root_name());
+
     // print the command rules
     for cmd in rules.cmd_ref() {
         println!("{}", cmd);
     }
 
     // auto generate additional alias rules if necessary
-    rules.alias_generator(attrs.auto_alias());
+    // rules.alias_generator(attrs.auto_alias());
 
     // print all alias rules
-    for al in rules.alias_ref() {
-        println!("{}", al);
-    }
+    // for al in rules.alias_ref() {
+    //     println!("{}", al);
+    // }
 
     println!();
 
-    let tok_cmds = rules.cmds_tokenizer();
-    for tcmd in tok_cmds {
-        println!("{}\n", tcmd);
-    }
+    // let tok_cmds = rules.cmds_tokenizer();
+    // for tcmd in tok_cmds {
+    //     println!("{}\n", tcmd);
+    // }
 
     quote::quote! {}.into()
 }
