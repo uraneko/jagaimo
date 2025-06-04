@@ -10,15 +10,17 @@ macro_rules! aliased_token {
         }
     };
 
-    ($s: literal, $t: ident, $a: ident) => {
+    ($s: literal, $t: ident, $a: ident, $n: ident) => {
         match $s {
             's' => AliasedToken::Space {
                 token: $t,
                 alias: Some($a),
+                nameless: $n,
             },
             'o' => AliasedToken::Operation {
                 token: $t,
                 alias: Some($a),
+                nameless: $n,
             },
             _ => panic!("macro expected 's' or 'o' as first token"),
         }
@@ -31,15 +33,17 @@ macro_rules! aliased_token {
         }
     };
 
-    ($s: literal, $t: ident) => {
+    ($s: literal, $t: ident, $n: ident) => {
         match $s {
             's' => AliasedToken::Space {
                 token: $t,
                 alias: None,
+                nameless: $n,
             },
             'o' => AliasedToken::Operation {
                 token: $t,
                 alias: None,
+                nameless: $n,
             },
             _ => panic!("macro expected 's', 'o' or 'f' as first token"),
         }
@@ -66,46 +70,41 @@ where
     }
 
     // returns self.cmd's space alias value if it exists
-    fn space_aliased(&self) -> Option<AliasedToken<'b>> {
+    fn space_aliased(&self) -> AliasedToken<'b> {
         // WARN altered for the sake expanding
         // if let Some(space) = self.cmd.space() { ...
         let space = self.cmd.space();
+        let nameless = !self.cmd.contains_space();
         let atok = self
             .alias
             .into_iter()
             .find(|al| al.scope() == &AliasScope::S && al.token() == space);
-        if atok.is_some() {
-            return atok.map(|al| {
-                let al = al.alias();
-                aliased_token!('s', space, al)
-            });
+        if let Some(al) = atok {
+            let al = al.alias();
+
+            return aliased_token!('s', space, al, nameless);
         }
 
-        return Some(aliased_token!('s', space));
-
-        None
+        aliased_token!('s', space, nameless)
     }
 
     // returns self.cmd's op alias value if it exists
-    fn op_aliased(&self) -> Option<AliasedToken<'b>> {
+    fn op_aliased(&self) -> AliasedToken<'b> {
         // WARN altered for the sake expanding
         // if let Some(op) = self.cmd.op() { ...
         let op = self.cmd.op();
+        let nameless = !self.cmd.contains_op();
         let atok = self
             .alias
             .into_iter()
             .find(|al| al.scope() == &AliasScope::O && al.token() == op);
+        if let Some(al) = atok {
+            let al = al.alias();
 
-        if atok.is_some() {
-            return atok.map(|al| {
-                let al = al.alias();
-                aliased_token!('o', op, al)
-            });
+            return aliased_token!('o', op, al, nameless);
         }
 
-        return Some(aliased_token!('o', op));
-
-        None
+        aliased_token!('o', op, nameless)
     }
 
     // returns self.cmd's flags alias values if at least one exists
@@ -136,11 +135,12 @@ where
     }
 
     pub fn lookup(self) -> TokenizedCommand<'b> {
-        let mut cmd = TokenizedCommand::default();
-        cmd.space = self.space_aliased();
-        cmd.op = self.op_aliased();
-        cmd.flags = self.flags_aliased();
-        cmd.params = self.cmd.params().map(|p| aliased_token!(p));
+        let mut cmd = TokenizedCommand::new(
+            self.space_aliased(),
+            self.op_aliased(),
+            self.flags_aliased(),
+            self.cmd.params().map(|p| aliased_token!(p)),
+        );
 
         cmd
     }
@@ -151,25 +151,31 @@ pub enum AliasedToken<'a> {
     Space {
         token: &'a Ident,
         alias: Option<&'a Ident>,
+        nameless: bool,
     },
+
     Operation {
         token: &'a Ident,
         alias: Option<&'a Ident>,
+        nameless: bool,
     },
+
     Flag {
         token: &'a Flag,
         alias: Option<&'a Ident>,
     },
+
     // this is not really an aliased token
     // but it is needed to be able to vectorize the tokenized command into a vec of tokens
     Params(&'a Type),
 }
 
 impl<'a> AliasedToken<'a> {
-    pub fn new_op(ident: &'a Ident) -> Self {
+    pub fn new_op(ident: &'a Ident, nameless: bool) -> Self {
         Self::Operation {
             token: ident,
             alias: None,
+            nameless,
         }
     }
 
@@ -187,36 +193,56 @@ impl<'a> AliasedToken<'a> {
             _ => None,
         }
     }
+
+    pub fn is_nameless(&self) -> bool {
+        match self {
+            Self::Space { nameless, .. } | Self::Operation { nameless, .. } => *nameless,
+            _ => false,
+        }
+    }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TokenizedCommand<'a> {
-    space: Option<AliasedToken<'a>>,
-    op: Option<AliasedToken<'a>>,
+    space: AliasedToken<'a>,
+    op: AliasedToken<'a>,
     flags: Option<Vec<AliasedToken<'a>>>,
     params: Option<AliasedToken<'a>>,
 }
 
 impl TokenizedCommand<'_> {
     pub fn is_space_op(&self) -> bool {
-        self.space.is_some() && self.op.is_some()
+        !self.space.is_nameless() && !self.op.is_nameless()
     }
 
     pub fn is_op(&self) -> bool {
-        self.op.is_some() && self.space.is_none()
+        self.space.is_nameless() && !self.op.is_nameless()
     }
 
     pub fn is_space(&self) -> bool {
-        self.op.is_none() && self.space.is_some()
+        !self.space.is_nameless() && self.op.is_nameless()
     }
 }
 
 impl<'a> TokenizedCommand<'a> {
-    pub fn space(&self) -> Option<AliasedToken<'a>> {
+    pub fn new(
+        space: AliasedToken<'a>,
+        op: AliasedToken<'a>,
+        flags: Option<Vec<AliasedToken<'a>>>,
+        params: Option<AliasedToken<'a>>,
+    ) -> Self {
+        Self {
+            space,
+            op,
+            flags,
+            params,
+        }
+    }
+    pub fn space(&self) -> AliasedToken<'a> {
         self.space.clone()
     }
 
-    pub fn op(&self) -> Option<AliasedToken<'a>> {
+    pub fn op(&self) -> AliasedToken<'a> {
         self.op.clone()
     }
 }
@@ -230,12 +256,11 @@ impl<'a> From<AliasLookup<'a>> for TokenizedCommand<'a> {
 impl<'a> From<TokenizedCommand<'a>> for Vec<AliasedToken<'a>> {
     fn from(value: TokenizedCommand<'a>) -> Self {
         let mut v = vec![];
-        if let Some(space) = value.space {
-            v.push(space);
-        }
-        if let Some(op) = value.op {
-            v.push(op);
-        }
+
+        v.push(value.space);
+
+        v.push(value.op);
+
         if let Some(flags) = value.flags {
             v.extend(flags);
         }
@@ -255,15 +280,29 @@ impl std::fmt::Display for AliasedToken<'_> {
             f,
             "{}",
             match self {
-                Self::Space { token, alias } | Self::Operation { token, alias } => format!(
-                    "{}{}",
+                Self::Space {
                     token,
-                    if let Some(a) = alias {
-                        format!("({})", a)
-                    } else {
+                    alias,
+                    nameless,
+                }
+                | Self::Operation {
+                    token,
+                    alias,
+                    nameless,
+                } =>
+                    if *nameless {
                         "".into()
-                    }
-                ),
+                    } else {
+                        format!(
+                            "{}{}",
+                            token,
+                            if let Some(a) = alias {
+                                format!("({})", a)
+                            } else {
+                                "".into()
+                            }
+                        )
+                    },
                 Self::Flag { token, alias } => format!(
                     "{}{}",
                     token,
@@ -284,13 +323,13 @@ impl std::fmt::Display for TokenizedCommand<'_> {
         write!(
             f,
             "S:{} O:{} F:{:?} P:{}",
-            if let Some(space) = &self.space {
-                format!("{}", space)
+            if !self.space.is_nameless() {
+                format!("{}", self.space)
             } else {
                 "".into()
             },
-            if let Some(op) = &self.op {
-                format!("{}", op)
+            if !self.op.is_nameless() {
+                format!("{}", self.op)
             } else {
                 "".into()
             },

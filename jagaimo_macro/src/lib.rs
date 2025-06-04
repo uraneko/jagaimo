@@ -43,10 +43,10 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
 
     println!();
 
-    // let tok_cmds = rules.cmds_tokenizer();
-    // for tcmd in tok_cmds {
-    //     println!("{}\n", tcmd);
-    // }
+    let tok_cmds = rules.cmds_tokenizer();
+    for tcmd in tok_cmds {
+        println!("{}\n", tcmd);
+    }
 
     quote::quote! {}.into()
 }
