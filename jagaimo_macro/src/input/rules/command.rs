@@ -42,11 +42,11 @@ impl PartialEq for CommandRule {
 
 impl CommandRule {
     pub fn contains_space(&self) -> bool {
-        self.nameless_space
+        !self.nameless_space
     }
 
     pub fn contains_op(&self) -> bool {
-        self.nameless_op
+        !self.nameless_op
     }
 
     pub fn contains_flags(&self) -> bool {
