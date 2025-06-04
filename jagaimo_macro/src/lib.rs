@@ -48,7 +48,7 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
         println!("{}\n", tcmd);
     }
 
-    quote::quote! {}.into()
+    rules.type_tree_renderer(attrs.root_name()).into()
 }
 
 // output

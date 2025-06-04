@@ -33,6 +33,14 @@ impl Flag {
             Self::Parameterized { ident, .. } => ident,
         }
     }
+
+    pub fn ty(&self) -> Option<&Type> {
+        let Self::Parameterized { ty, .. } = self else {
+            return None;
+        };
+
+        Some(ty)
+    }
 }
 
 impl Parse for Flag {

@@ -1,11 +1,12 @@
 use std::collections::HashSet;
 
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream as TS2};
 use syn::Ident;
 use syn::parse::{Parse, ParseStream, Result as PRes};
 
 use super::{AliasScope, Flag};
 use crate::output::AliasGenerator;
+use crate::output::TypeTree;
 use crate::output::{AliasLookup, TokenizedCommand};
 
 pub mod alias;
@@ -79,15 +80,17 @@ impl Rules {
 
         self.alias = std::mem::take(&mut alias);
     }
-}
 
-impl Rules {
     pub fn cmds_tokenizer(&self) -> Vec<TokenizedCommand> {
         self.cmd
             .iter()
             .map(|cmd| AliasLookup::new(cmd, &self.alias))
             .map(|al| al.lookup())
             .collect()
+    }
+
+    pub fn type_tree_renderer(&self, root_name: &str) -> TS2 {
+        TypeTree::new(self.cmds_tokenizer(), root_name).render()
     }
 }
 

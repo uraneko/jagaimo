@@ -187,6 +187,28 @@ impl<'a> AliasedToken<'a> {
         true
     }
 
+    pub fn is_nameless(&self) -> bool {
+        match self {
+            Self::Space { nameless, .. } | Self::Operation { nameless, .. } => *nameless,
+            _ => false,
+        }
+    }
+
+    pub fn is_op(&self) -> bool {
+        let Self::Operation { .. } = self else {
+            return false;
+        };
+
+        true
+    }
+    pub fn is_flag(&self) -> bool {
+        let Self::Flag { .. } = self else {
+            return false;
+        };
+
+        true
+    }
+
     pub fn ident(&self) -> Option<&'a Ident> {
         match self {
             Self::Space { token, .. } | Self::Operation { token, .. } => Some(token),
@@ -194,10 +216,19 @@ impl<'a> AliasedToken<'a> {
         }
     }
 
-    pub fn is_nameless(&self) -> bool {
+    pub fn flag(&self) -> Option<&'a Flag> {
+        let Self::Flag { token, .. } = self else {
+            return None;
+        };
+
+        Some(token)
+    }
+
+    pub fn ty(&self) -> Option<&'a Type> {
         match self {
-            Self::Space { nameless, .. } | Self::Operation { nameless, .. } => *nameless,
-            _ => false,
+            Self::Flag { token, .. } => token.ty(),
+            Self::Params(ty) => Some(ty),
+            _ => None,
         }
     }
 }
@@ -238,12 +269,28 @@ impl<'a> TokenizedCommand<'a> {
             params,
         }
     }
-    pub fn space(&self) -> AliasedToken<'a> {
+    pub fn space_cloned(&self) -> AliasedToken<'a> {
         self.space.clone()
     }
 
-    pub fn op(&self) -> AliasedToken<'a> {
+    pub fn space(&self) -> &AliasedToken<'a> {
+        &self.space
+    }
+
+    pub fn op(&self) -> &AliasedToken<'a> {
+        &self.op
+    }
+
+    pub fn op_cloned(&self) -> AliasedToken<'a> {
         self.op.clone()
+    }
+
+    pub fn flags_cloned(&self) -> Option<Vec<AliasedToken<'a>>> {
+        self.flags.clone()
+    }
+
+    pub fn params_cloned(&self) -> Option<AliasedToken<'a>> {
+        self.params.clone()
     }
 }
 

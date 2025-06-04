@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
-use proc_macro2::Span;
+use proc_macro2::{Span, TokenStream as TS2};
+use quote::quote;
 use syn::{Ident, Type};
 
 use super::{AliasedToken, TokenizedCommand};
@@ -9,47 +10,94 @@ use crate::input::Flag;
 #[derive(Debug, Clone)]
 pub struct TypeTree<'a> {
     root: RootType<'a>,
-    spaces: HashSet<SpaceType<'a>>,
-    ops: HashSet<OpType<'a>>,
+    spaces: Vec<SpaceType<'a>>,
+    ops: Vec<OpType<'a>>,
 }
 
-impl TypeTree<'_> {
-    fn new(tcmd: Vec<TokenizedCommand>) -> Self {
+// TODO when nameless resolution is handled after parsing macro input
+// operation name conflicts should also be handled
+// i.e., given 2 command rules
+// s(history) o(view) ....
+// s(collections) o(view) ...
+// s(hosts) o(view)
+//
+// 3 possible cases
+// * all view ops have different contexts
+// -> each op is renamed to space_name_op_name
+// <- this way, they are treated as different ops in type tree generation
+// * all view ops have the same contexts
+// -> no additional work is done
+// <- all 3 ops are treated as the same op in type tree generation
+// * most (2) of the 3 ops have the same context
+// -> the 2 that  have the same context are left as is
+// and the unique one is renamed to space_name_op_name
+// <- this way name conflicts are avoided in the type tree
+
+impl<'a> TypeTree<'a> {
+    pub fn new(tcmd: Vec<TokenizedCommand<'a>>, root_name: &str) -> Self {
         let mut iter = tcmd.into_iter();
         let mut spaces: HashMap<&Ident, SpaceType<'_>> = HashMap::new();
         let mut ops: HashMap<&Ident, OpType<'_>> = HashMap::new();
         while let Some(cmd) = iter.next() {
-            match cmd {
-                // command is a space operation
-                tc if tc.is_space_op() => {
-                    let space = tc.space().unwrap();
-                    let ident = space.ident().unwrap();
-                    let op = tc.op().unwrap();
+            let space = cmd.space_cloned();
+            let ident = space.ident().unwrap();
+            let op = cmd.op_cloned();
 
-                    if !spaces.contains(ident) {
-                        spaces.register(space);
-                    }
-                    spaces.update(ident, op);
-                }
-                // command is a space anonymous command
-                tc if tc.is_space() => {
-                    let space = tc.space().unwrap();
-                    let ident = space.ident().unwrap();
-                    // let op = nameless_ident(&ident);
-
-                    if !spaces.contains(ident) {
-                        spaces.register(space);
-                    }
-                    // spaces.update(ident, op);
-                }
-                // command is an anonymous operation command
-                tc if tc.is_op() => {}
-                // command is somethig else, unreachable
-                _ => panic!(),
+            if !spaces.contains(ident) {
+                spaces.register(space);
             }
+            spaces.update(ident, op);
+
+            let ident = cmd.op().ident().unwrap();
+            ops.register(cmd.op_cloned());
+
+            if let Some(flags) = cmd.flags_cloned() {
+                flags.into_iter().for_each(|f| ops.update(ident, f))
+            };
+
+            if let Some(params) = cmd.params_cloned() {
+                ops.update(ident, params);
+            }
+            // match cmd {
+            //     // command is a space operation
+            //     // some space's named command
+            //     tc if tc.is_space_op() => {}
+            //     // command is a space nameless command
+            //     // some space's nameless command
+            //     tc if tc.is_space() => {}
+            //     // command is an nameless operation command
+            //     // root nameless command
+            //     tc if tc.is_op() => {}
+            //     // command is somethig else, unreachable
+            //     _ => panic!(),
+            // }
         }
 
-        todo!()
+        let root_name = Ident::new(root_name, Span::call_site());
+        let root_variants = spaces.clone().into_keys().collect();
+        let root = RootType {
+            ident: root_name,
+            variants: root_variants,
+        };
+
+        let spaces = spaces.into_values().collect();
+        let ops = ops.into_values().collect();
+
+        Self { root, spaces, ops }
+    }
+
+    pub fn render(self) -> TS2 {
+        let root = self.root.render();
+        let spaces = self.spaces.into_iter().map(|s| s.render());
+        let ops = self.ops.into_iter().map(|o| o.render());
+
+        quote! {
+            #root
+
+            #(#spaces)*
+
+            #(#ops)*
+        }
     }
 }
 
@@ -112,15 +160,46 @@ impl<'a> TypeTreeExt<'a, OpType<'a>> for HashMap<&'a Ident, OpType<'a>> {
         );
     }
 
-    fn update(&mut self, ident: &Ident, variant: AliasedToken<'a>) {
-        self.get_mut(ident).map(|ot| ot.insert(variant));
+    fn update(&mut self, ident: &Ident, token: AliasedToken<'a>) {
+        if token.is_space() || token.is_op() {
+            // TODO error
+            return;
+        }
+
+        self.get_mut(ident).map(|ot| {
+            if token.is_flag() {
+                ot.insert_flag(token);
+            } else {
+                ot.set_params(token)
+            }
+        });
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootType<'a> {
-    ident: AliasedToken<'a>,
-    variants: HashSet<AliasedToken<'a>>,
+    ident: Ident,
+    variants: Vec<&'a Ident>,
+}
+
+impl RootType<'_> {
+    fn render(self) -> TS2 {
+        let ident = self.ident;
+        let mut variants = self.variants;
+
+        if variants.len() == 1 {
+            let variant = variants.pop().unwrap();
+            quote! {
+                struct #ident (#variant);
+            }
+        } else {
+            quote! {
+                enum #ident {
+                    #(#variants,)*
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -133,6 +212,26 @@ impl<'a> SpaceType<'a> {
     fn insert(&mut self, variant: AliasedToken<'a>) {
         _ = self.variants.insert(variant);
     }
+
+    fn render(self) -> TS2 {
+        println!("1");
+        let ident = self.ident.ident().unwrap();
+        let mut variants = self.variants.into_iter().map(|atok| atok.ident().unwrap());
+
+        if variants.len() == 1 {
+            let variant = variants.next().unwrap();
+            println!("1");
+            quote! {
+                struct #ident (#variant);
+            }
+        } else {
+            quote! {
+                enum #ident {
+                    #(#variants,)*
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -143,11 +242,40 @@ pub struct OpType<'a> {
 }
 
 impl<'a> OpType<'a> {
-    fn insert(&mut self, field: AliasedToken<'a>) {
+    fn insert_flag(&mut self, field: AliasedToken<'a>) {
         _ = self.fields.insert(field);
     }
 
     fn set_params(&mut self, params: AliasedToken<'a>) {
         _ = self.params = Some(params);
+    }
+
+    fn render(self) -> TS2 {
+        println!("2");
+        let ident = self.ident.ident().unwrap();
+        let fields = self.fields.into_iter().map(|f| {
+            println!("{}", f);
+            let flag = f.flag().unwrap();
+            let ident = flag.ident();
+            let ty = flag
+                .ty()
+                .map(|ty| quote! { #ty })
+                .unwrap_or_else(|| quote! { bool });
+
+            quote! { #ident: #ty  }
+        });
+
+        let params = self
+            .params
+            .map(|p| p.ty().unwrap())
+            .map(|ty| quote! { params: #ty });
+
+        println!("2");
+        quote! {
+            struct #ident {
+                #(#fields,)*
+                #params
+            }
+        }
     }
 }
