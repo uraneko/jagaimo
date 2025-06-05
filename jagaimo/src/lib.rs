@@ -16,7 +16,7 @@ jagaimo! {
     s(remote) = rmt
     s(collections) = colls
 
-    c { s(history) o(view) [ <i32> filter<String> colored query<String> ] }
+    c { s(history_stack) o(view) [ <i32> filter<String> colored query<String> ] }
     c { s(history) o(view) [ flatten encoding<String> max<u8> max<f64> ] }
     c { s(history) o(list) [ max<u8> verbose tags<Vec<String>> ] }
     c { [ <(String, f64)> size<Dimensions> show_all ] }

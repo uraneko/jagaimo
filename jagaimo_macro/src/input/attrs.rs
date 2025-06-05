@@ -5,21 +5,8 @@ use syn::parse::{Parse, ParseStream, Result as PRes};
 use syn::{Ident, Lit};
 use syn::{bracketed, parenthesized};
 
+use super::enforce_str_nc;
 use crate::resolve_crate::ResolveCrate;
-
-pub fn enforce_nc(name: &mut String) {
-    name.replace_range(
-        0..1,
-        &name.get(0..1).map(|s| s.to_ascii_uppercase()).unwrap(),
-    );
-
-    while let Some(idx) = name.find('_') {
-        let next = name.get(idx + 1..idx + 2);
-        if let Some(s) = next {
-            name.replace_range(idx..idx + 2, &s.to_ascii_uppercase());
-        }
-    }
-}
 
 #[derive(Debug)]
 pub struct Attrs {
@@ -148,7 +135,7 @@ impl Parse for Attrs {
         // TODO dont capitalize any type name when this flag is on
         if !attrs.ignore_naming_conventions {
             // TODO all type tree type idents need this
-            enforce_nc(&mut attrs.root_name);
+            enforce_str_nc(&mut attrs.root_name);
         }
 
         Ok(attrs)

@@ -4,13 +4,13 @@ use std::hash::{Hash, Hasher};
 use proc_macro2::Span;
 use quote::ToTokens;
 use syn::Token;
-use syn::ext::IdentExt;
 use syn::parse::{Parse, ParseStream, Result as PRes};
 use syn::token::Bracket;
 use syn::{Ident, Type};
 use syn::{braced, bracketed, parenthesized};
 
-use super::{AliasScope, Flag};
+use super::Flag;
+use crate::input::to_enforced_ident_nc;
 
 // TODO
 // deduplication of rules
@@ -174,6 +174,19 @@ impl ExpandingCommandRule {
 
     fn clone_params(&self) -> Option<Type> {
         self.params.clone()
+    }
+
+    pub fn resolve_naming_conventions(&mut self, ignore_nc: bool) {
+        if ignore_nc {
+            return;
+        }
+
+        self.spaces.iter_mut().for_each(|s| {
+            to_enforced_ident_nc(s);
+        });
+        self.ops.iter_mut().for_each(|s| {
+            to_enforced_ident_nc(s);
+        });
     }
 
     pub fn resolve_bare_scopes(&mut self, root_name: &str) {

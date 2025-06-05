@@ -25,7 +25,7 @@ pub struct RulesUnresolved {
 }
 
 impl RulesUnresolved {
-    pub fn commands_resolution(self, root_name: &str) -> Rules {
+    pub fn commands_resolution(self, root_name: &str, ignore_nc: bool) -> Rules {
         Rules {
             alias: self.alias,
             trnsf: self.trnsf,
@@ -35,6 +35,7 @@ impl RulesUnresolved {
                 .cmd
                 .into_iter()
                 .map(|mut exp| {
+                    exp.resolve_naming_conventions(ignore_nc);
                     exp.resolve_bare_scopes(root_name);
 
                     exp.expand()
@@ -75,7 +76,21 @@ impl Rules {
 }
 
 impl Rules {
-    pub fn resolve_operations_naming_conflicts(&mut self) {}
+    // TODO nc resolution
+
+    pub fn resolve_operations_naming_conflicts(&mut self) {
+        // for every operation name across all commands
+        //
+        // find all operations with the same name across all commands
+        //
+        // check context equality of all those ops
+        //
+        // the biggest number of ops that have a matching context take the original
+        // op name, and all the others take a space prefix to their names
+        //
+        // if all groups are equal
+        // then all take prefixed names
+    }
 
     pub fn alias_generator(&mut self, auto_alias: bool) {
         if !auto_alias {

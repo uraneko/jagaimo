@@ -31,7 +31,7 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
     // rules.resolve_ops_name_conflicts();
 
     // resolve bare spaces and operations in command rules
-    let mut rules = rules.commands_resolution(attrs.root_name());
+    let mut rules = rules.commands_resolution(attrs.root_name(), attrs.ignore_nc());
 
     // print the command rules
     for cmd in rules.cmd_ref() {
