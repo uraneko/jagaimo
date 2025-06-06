@@ -1,9 +1,10 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use proc_macro2::{Span, TokenStream as TS2};
 use syn::Ident;
 use syn::parse::{Parse, ParseStream, Result as PRes};
 
+use super::scope::{Context, Scope};
 use super::{AliasScope, Flag};
 use crate::output::AliasGenerator;
 use crate::output::TypeTree;
@@ -76,22 +77,45 @@ impl Rules {
 }
 
 impl Rules {
-    // TODO nc resolution
-
     pub fn resolve_operations_naming_conflicts(&mut self) {
-        // for every operation name across all commands
-        //
-        // find all operations with the same name across all commands
-        //
-        // check context equality of all those ops
-        //
-        // the biggest number of ops that have a matching context take the original
-        // op name, and all the others take a space prefix to their names
-        //
-        // if all groups are equal
-        // then all take prefixed names
-    }
+        // take the command rules
+        let mut cmd = std::mem::take(&mut self.cmd);
+        // declare needed variables
+        let mut map: HashMap<u64, Vec<CommandRule>> = HashMap::new();
+        let mut iter = cmd.into_iter();
 
+        // group command rules by scope hash; i.e., by scope op equality
+        while let Some(cr) = iter.next() {
+            let scope_hash = cr.scope_hash();
+            if let Some(ss) = map.get_mut(&scope_hash) {
+                ss.push(cr);
+            } else {
+                map.insert(scope_hash, vec![cr]);
+            }
+        }
+
+        // iterate over scoped groups
+        let mut iter = map.into_values().into_iter();
+        // check context equality
+        // and change op names when required
+        while let Some(group) = iter.next() {
+            // for now we simply stick to checking if all contexts are equal
+            // if so then nothing is done
+            // otherwise we prefix all operations names with their spaces
+            println!("????{:?}????", group.len());
+            if group.len() == 1 || group.iter().all(|cr| cr.context() == group[0].context()) {
+                self.cmd.extend(group);
+            } else {
+                self.cmd.extend(group.into_iter().map(|mut cr| {
+                    cr.prefix_op();
+                    cr
+                }))
+            }
+        }
+    }
+}
+
+impl Rules {
     pub fn alias_generator(&mut self, auto_alias: bool) {
         if !auto_alias {
             return;

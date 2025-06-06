@@ -10,6 +10,7 @@ use syn::{Ident, Type};
 use syn::{braced, bracketed, parenthesized};
 
 use super::Flag;
+use crate::input::scope::{Context, Scope};
 use crate::input::to_enforced_ident_nc;
 
 // TODO
@@ -55,12 +56,39 @@ impl CommandRule {
 }
 
 impl CommandRule {
+    pub fn space_cloned(&self) -> Ident {
+        self.space.clone()
+    }
+
+    pub fn op_cloned(&self) -> Ident {
+        self.op.clone()
+    }
+
     pub fn space(&self) -> &Ident {
         &self.space
     }
 
     pub fn op(&self) -> &Ident {
         &self.op
+    }
+
+    pub fn scope_hash(&self) -> u64 {
+        <&Self as Into<Scope>>::into(&self).into_hash()
+    }
+
+    pub fn context(&self) -> Context {
+        self.into()
+    }
+
+    pub fn prefix_op(&mut self) {
+        self.op = Ident::new(
+            &{
+                let s = format!("{}{}", self.space, self.op);
+
+                s
+            },
+            Span::call_site(),
+        );
     }
 
     pub fn flags(&self) -> Option<&[Flag]> {
@@ -75,16 +103,6 @@ impl CommandRule {
 
     pub fn params(&self) -> Option<&Type> {
         self.params.as_ref()
-    }
-}
-
-impl CommandRule {
-    pub fn space_cloned(&self) -> Ident {
-        self.space.clone()
-    }
-
-    pub fn op_cloned(&self) -> Ident {
-        self.op.clone()
     }
 }
 

@@ -16,11 +16,12 @@ jagaimo! {
     s(remote) = rmt
     s(collections) = colls
 
-    c { s(history_stack) o(view) [ <i32> filter<String> colored query<String> ] }
+    c { s(hosts) o(view) [ <i32> filter<String> colored query<String> ] }
     c { s(history) o(view) [ flatten encoding<String> max<u8> max<f64> ] }
-    c { s(history) o(list) [ max<u8> verbose tags<Vec<String>> ] }
+    c { s(history) o(annotate) [ max<u8> verbose tags<Vec<String>> ] }
     c { [ <(String, f64)> size<Dimensions> show_all ] }
     c { s(collections) o(obfuscate) [ <std::fs::File> allocate  rand<f64> hash<String> fuzzing algorithm<String> ] }
+    c { o(view) [ list_all theme<String> ] }
     c { s(collections) o(list) [ <Vec<f64>> long pipe_into_list_of<String> output_file<std::fs::File> ] }
     // t { s(colls) o(list) |_ base: String|
     //         { if base == "_" { auto as bool } else { base "BASE{base}" as Base } }

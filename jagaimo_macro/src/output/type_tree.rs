@@ -40,8 +40,8 @@ pub struct TypeTree<'a> {
 //
 // TODO spaceless operations all belong to root space
 //
-// WARN space and op names are always there because every command needs a space and op name/id for
-// its states to be reprensented
+// WARN space and op names are always there because every command needs a space and op names/ids for
+// its states to be reprensented in the type tree
 //  but when figuring the space and op of a command
 //  the valid check is to use is_bare method on scope tokens
 impl<'a> TypeTree<'a> {
