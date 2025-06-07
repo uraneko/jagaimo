@@ -135,7 +135,7 @@ fn extract_context_tokens(s: ParseStream) -> PRes<(Vec<Flag>, Option<Type>)> {
     Ok((f.into_iter().collect(), p))
 }
 
-pub fn extract_scope_tokens(s: ParseStream) -> PRes<Vec<Ident>> {
+pub fn extract_scope_tokens(s: ParseStream, scope: &str) -> PRes<Vec<Ident>> {
     // anonymous scope
     if s.peek(Bracket) {
         return Ok(vec![]);
@@ -143,14 +143,18 @@ pub fn extract_scope_tokens(s: ParseStream) -> PRes<Vec<Ident>> {
     // just because next is not a [
     // doesnt mean it would be an ident
     // but failing is such a case is intended behaviour
-    let _i = Ident::parse(&s)?;
 
-    let scopes;
-    _ = parenthesized!(scopes in s);
-    // use punctuated instead
-    scopes
-        .parse_terminated(Ident::parse, Token![,])
-        .map(|p| p.into_iter().collect())
+    if s.fork().parse::<Ident>()? == Ident::new(scope, Span::call_site()) {
+        _ = Ident::parse(s)?;
+        let scopes;
+        _ = parenthesized!(scopes in s);
+        // use punctuated instead
+        return scopes
+            .parse_terminated(Ident::parse, Token![,])
+            .map(|p| p.into_iter().collect());
+    }
+
+    Ok(vec![])
 }
 
 // makes a new ident for a bare operation
@@ -216,9 +220,11 @@ impl ExpandingCommandRule {
                 self.ops.push(ident);
             }
             [true, false] => {
+                println!("nospace/op, {:?}|{:?}", self.spaces, self.ops);
                 self.spaces.push(Ident::new(root_name, Span::call_site()));
             }
             [false, true] => {
+                println!("nospace/op, {:?}|{:?}", self.spaces, self.ops);
                 self.spaces.iter().for_each(|s| {
                     self.ops.push(bare_ident(s));
                 });
@@ -293,8 +299,12 @@ impl Parse for ExpandingCommandRule {
         _ = braced!(content in stream);
         // there is some scope
 
-        let spaces = extract_scope_tokens(&content)?;
-        let ops = extract_scope_tokens(&content)?;
+        let spaces = extract_scope_tokens(&content, "s")?;
+        let ops = extract_scope_tokens(&content, "o")?;
+
+        if !content.peek(Bracket) {
+            return Ok(ExpandingCommandRule::new(spaces, ops, vec![], None));
+        }
 
         let context;
         _ = bracketed!(context in content);
