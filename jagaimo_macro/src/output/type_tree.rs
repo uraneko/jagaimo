@@ -284,28 +284,39 @@ impl<'a> SpaceType<'a> {
         )
     }
 
+    fn has_sole_op(&self) -> bool {
+        self.ops.len() + if self.direct_op.is_some() { 1 } else { 0 } == 1
+    }
+
     fn render_variant(self) -> TS2 {
         let module_name = self.module_name();
-        let mut ident = self.token.ident().unwrap().clone();
+        let ident = self.token.ident().unwrap().clone();
 
-        if self.ops.len() == 1 {
-            ident = Ident::new(
-                &(ident.to_string()
-                    + &self
-                        .ops
-                        .into_iter()
-                        .next()
-                        .unwrap()
-                        .token
-                        .ident()
-                        .unwrap()
-                        .to_string()),
-                Span::call_site(),
-            );
-        }
+        if self.has_sole_op() {
+            let op = if let Some(op) = self.direct_op {
+                op
+            } else {
+                self.ops.into_iter().next().unwrap()
+            };
+            let opi = if op.token.is_direct_op() {
+                ident
+            } else {
+                Ident::new(
+                    &(ident.to_string() + &op.token.ident().unwrap().to_string()),
+                    Span::call_site(),
+                )
+            };
 
-        quote! {
-            #ident ( #module_name :: #ident )
+            let fields = op.render_fields();
+
+            return quote! {
+                #opi { #fields }
+            };
+        } else {
+            let ident = self.token.ident().unwrap().clone();
+            return quote! {
+                #ident ( #module_name :: #ident )
+            };
         }
     }
 
@@ -314,6 +325,9 @@ impl<'a> SpaceType<'a> {
         let mod_ident = self.module_name();
 
         let op_count = if self.direct_op.is_some() { 1 } else { 0 } + self.ops.len();
+        if op_count == 1 {
+            return quote! {};
+        };
         let space_type = if op_count == 1 {
             let (op, ident) = if let Some(op) = self.direct_op {
                 (op, ident.clone())
