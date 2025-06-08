@@ -26,13 +26,10 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
     };
     // print the attributes
     // println!("{:#?}", attrs);
-    println!("{:#?}", rules);
-
-    // resolve name conflicts of operations
-    // rules.resolve_ops_name_conflicts();
 
     // resolve bare spaces and operations in command rules
     let mut rules = rules.commands_resolution(attrs.root_name(), attrs.ignore_nc());
+    // resolve name conflicts of operations
     rules.resolve_operations_naming_conflicts();
 
     // print the command rules

@@ -5,7 +5,7 @@ use crate::input::{AliasRule, AliasScope, CommandRule, Flag};
 macro_rules! aliased_token {
     ('f', $t: ident, $a: ident) => {
         AliasedToken::Flag {
-            token: $t,
+            flag: $t,
             alias: Some($a),
         }
     };
@@ -13,14 +13,13 @@ macro_rules! aliased_token {
     ($s: literal, $t: ident, $a: ident, $n: ident) => {
         match $s {
             's' => AliasedToken::Space {
-                token: $t,
+                space: $t,
                 alias: Some($a),
-                bare: $n,
+                is_root: $n,
             },
             'o' => AliasedToken::Operation {
-                token: $t,
+                op: $t,
                 alias: Some($a),
-                bare: $n,
             },
             _ => panic!("macro expected 's' or 'o' as first token"),
         }
@@ -28,7 +27,7 @@ macro_rules! aliased_token {
 
     ('f', $t: ident) => {
         AliasedToken::Flag {
-            token: $t,
+            flag: $t,
             alias: None,
         }
     };
@@ -36,14 +35,13 @@ macro_rules! aliased_token {
     ($s: literal, $t: ident, $n: ident) => {
         match $s {
             's' => AliasedToken::Space {
-                token: $t,
+                space: $t,
                 alias: None,
-                bare: $n,
+                is_root: $n,
             },
             'o' => AliasedToken::Operation {
-                token: $t,
+                op: $t,
                 alias: None,
-                bare: $n,
             },
             _ => panic!("macro expected 's', 'o' or 'f' as first token"),
         }
@@ -74,7 +72,7 @@ where
         // WARN altered for the sake expanding
         // if let Some(space) = self.cmd.space() { ...
         let space = self.cmd.space();
-        let bare = !self.cmd.contains_space();
+        let direct = !self.cmd.contains_space();
         let atok = self
             .alias
             .into_iter()
@@ -82,10 +80,10 @@ where
         if let Some(al) = atok {
             let al = al.alias();
 
-            return aliased_token!('s', space, al, bare);
+            return aliased_token!('s', space, al, direct);
         }
 
-        aliased_token!('s', space, bare)
+        aliased_token!('s', space, direct)
     }
 
     // returns self.cmd's op alias value if it exists
@@ -93,7 +91,7 @@ where
         // WARN altered for the sake expanding
         // if let Some(op) = self.cmd.op() { ...
         let op = self.cmd.op();
-        let bare = !self.cmd.contains_op();
+        let direct = !self.cmd.contains_op();
         let atok = self
             .alias
             .into_iter()
@@ -101,10 +99,10 @@ where
         if let Some(al) = atok {
             let al = al.alias();
 
-            return aliased_token!('o', op, al, bare);
+            return aliased_token!('o', op, al, direct);
         }
 
-        aliased_token!('o', op, bare)
+        aliased_token!('o', op, direct)
     }
 
     // returns self.cmd's flags alias values if at least one exists
@@ -135,7 +133,7 @@ where
     }
 
     pub fn lookup(self) -> TokenizedCommand<'b> {
-        let mut cmd = TokenizedCommand::new(
+        let cmd = TokenizedCommand::new(
             self.space_aliased(),
             self.op_aliased(),
             self.flags_aliased(),
@@ -149,19 +147,18 @@ where
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum AliasedToken<'a> {
     Space {
-        token: &'a Ident,
+        space: &'a Ident,
         alias: Option<&'a Ident>,
-        bare: bool,
+        is_root: bool,
     },
 
     Operation {
-        token: &'a Ident,
+        op: &'a Ident,
         alias: Option<&'a Ident>,
-        bare: bool,
     },
 
     Flag {
-        token: &'a Flag,
+        flag: &'a Flag,
         alias: Option<&'a Ident>,
     },
 
@@ -171,11 +168,10 @@ pub enum AliasedToken<'a> {
 }
 
 impl<'a> AliasedToken<'a> {
-    pub fn new_op(ident: &'a Ident, bare: bool) -> Self {
+    pub fn new_op(ident: &'a Ident) -> Self {
         Self::Operation {
-            token: ident,
+            op: ident,
             alias: None,
-            bare,
         }
     }
 
@@ -187,9 +183,10 @@ impl<'a> AliasedToken<'a> {
         true
     }
 
-    pub fn is_bare(&self) -> bool {
+    pub fn is_direct(&self) -> bool {
         match self {
-            Self::Space { bare, .. } | Self::Operation { bare, .. } => *bare,
+            Self::Space { is_root, .. } => *is_root,
+            Self::Operation { .. } => self.is_direct(),
             _ => false,
         }
     }
@@ -201,6 +198,15 @@ impl<'a> AliasedToken<'a> {
 
         true
     }
+
+    pub fn is_direct_op(&self) -> bool {
+        let Self::Operation { op, .. } = self else {
+            return false;
+        };
+
+        crate::input::rules::command::is_direct_op(op)
+    }
+
     pub fn is_flag(&self) -> bool {
         let Self::Flag { .. } = self else {
             return false;
@@ -211,22 +217,23 @@ impl<'a> AliasedToken<'a> {
 
     pub fn ident(&self) -> Option<&'a Ident> {
         match self {
-            Self::Space { token, .. } | Self::Operation { token, .. } => Some(token),
+            Self::Space { space, .. } => Some(space),
+            Self::Operation { op, .. } => Some(op),
             _ => None,
         }
     }
 
     pub fn flag(&self) -> Option<&'a Flag> {
-        let Self::Flag { token, .. } = self else {
+        let Self::Flag { flag, .. } = self else {
             return None;
         };
 
-        Some(token)
+        Some(flag)
     }
 
     pub fn ty(&self) -> Option<&'a Type> {
         match self {
-            Self::Flag { token, .. } => token.ty(),
+            Self::Flag { flag, .. } => flag.ty(),
             Self::Params(ty) => Some(ty),
             _ => None,
         }
@@ -242,16 +249,19 @@ pub struct TokenizedCommand<'a> {
 }
 
 impl TokenizedCommand<'_> {
+    #[deprecated]
     pub fn is_space_op(&self) -> bool {
-        !self.space.is_bare() && !self.op.is_bare()
+        !self.space.is_direct() && !self.op.is_direct()
     }
 
+    #[deprecated]
     pub fn is_op(&self) -> bool {
-        self.space.is_bare() && !self.op.is_bare()
+        self.space.is_direct() && !self.op.is_direct()
     }
 
+    #[deprecated]
     pub fn is_space(&self) -> bool {
-        !self.space.is_bare() && self.op.is_bare()
+        !self.space.is_direct() && self.op.is_direct()
     }
 }
 
@@ -322,18 +332,23 @@ impl<'a> From<TokenizedCommand<'a>> for Vec<AliasedToken<'a>> {
 impl std::fmt::Display for AliasedToken<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         use quote::ToTokens;
+        compile_error!("this panic! with a SIGSEGV");
 
         write!(
             f,
             "{}",
             match self {
-                Self::Space { token, alias, bare } | Self::Operation { token, alias, bare } =>
-                    if *bare {
+                Self::Space {
+                    space,
+                    alias,
+                    is_root,
+                } =>
+                    if *is_root {
                         "".into()
                     } else {
                         format!(
                             "{}{}",
-                            token,
+                            space,
                             if let Some(a) = alias {
                                 format!("({})", a)
                             } else {
@@ -341,9 +356,23 @@ impl std::fmt::Display for AliasedToken<'_> {
                             }
                         )
                     },
-                Self::Flag { token, alias } => format!(
+                Self::Operation { op, alias } =>
+                    if self.is_direct() {
+                        "".into()
+                    } else {
+                        format!(
+                            "{}{}",
+                            op,
+                            if let Some(a) = alias {
+                                format!("({})", a)
+                            } else {
+                                "".into()
+                            }
+                        )
+                    },
+                Self::Flag { flag, alias } => format!(
                     "{}{}",
-                    token,
+                    flag,
                     if let Some(a) = alias {
                         format!("({})", a)
                     } else {
@@ -361,12 +390,12 @@ impl std::fmt::Display for TokenizedCommand<'_> {
         write!(
             f,
             "S:{} O:{} F:{:?} P:{}",
-            if !self.space.is_bare() {
+            if !self.space.is_direct() {
                 format!("{}", self.space)
             } else {
                 "".into()
             },
-            if !self.op.is_bare() {
+            if !self.op.is_direct() {
                 format!("{}", self.op)
             } else {
                 "".into()

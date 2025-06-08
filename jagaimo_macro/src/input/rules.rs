@@ -37,7 +37,7 @@ impl RulesUnresolved {
                 .into_iter()
                 .map(|mut exp| {
                     exp.resolve_naming_conventions(ignore_nc);
-                    exp.resolve_bare_scopes(root_name);
+                    exp.resolve_direct_scopes(root_name);
 
                     exp.expand()
                 })
@@ -77,6 +77,7 @@ impl Rules {
 }
 
 impl Rules {
+    #[deprecated]
     pub fn resolve_operations_naming_conflicts(&mut self) {
         // take the command rules
         let mut cmd = std::mem::take(&mut self.cmd);

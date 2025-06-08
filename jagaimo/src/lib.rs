@@ -1,6 +1,7 @@
 use jagaimo_macro::jagaimo;
 
 jagaimo! {
+
     #[
         no_help,
         no_version,

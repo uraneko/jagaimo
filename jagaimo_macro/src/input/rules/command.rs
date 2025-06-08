@@ -17,10 +17,9 @@ use crate::input::to_enforced_ident_nc;
 // deduplication of rules
 #[derive(Debug, Clone, Eq)]
 pub struct CommandRule {
+    is_of_root: bool,
     space: Ident,
-    bare_space: bool,
     op: Ident,
-    bare_op: bool,
     flags: Option<Vec<Flag>>,
     params: Option<Type>,
 }
@@ -43,11 +42,11 @@ impl PartialEq for CommandRule {
 
 impl CommandRule {
     pub fn contains_space(&self) -> bool {
-        !self.bare_space
+        !self.is_of_root
     }
 
     pub fn contains_op(&self) -> bool {
-        !self.bare_op
+        is_direct_op(&self.op)
     }
 
     pub fn contains_flags(&self) -> bool {
@@ -110,8 +109,6 @@ impl CommandRule {
 pub struct ExpandingCommandRule {
     spaces: Vec<Ident>,
     ops: Vec<Ident>,
-    bare_op: bool,
-    bare_space: bool,
     flags: Vec<Flag>,
     params: Option<Type>,
 }
@@ -157,20 +154,30 @@ pub fn extract_scope_tokens(s: ParseStream, scope: &str) -> PRes<Vec<Ident>> {
     Ok(vec![])
 }
 
-// makes a new ident for a bare operation
-fn bare_ident(ident: &Ident) -> Ident {
-    Ident::new(&(ident.to_string() + "Bare"), Span::call_site())
+// makes a new ident for a direct operation from a space ident
+fn direct_from_ident(ident: &Ident) -> Ident {
+    Ident::new(&(ident.to_string() + "DirectOp"), Span::call_site())
 }
 
-fn bare_str_ident(s: &str) -> Ident {
-    Ident::new(&(s.to_string() + "Bare"), Span::call_site())
+// makes a new ident for a direct operation from a space stringified ident
+fn direct_from_str(s: &str) -> Ident {
+    Ident::new(&(s.to_string() + "DirectOp"), Span::call_site())
+}
+
+// checks if an operation is a direct one
+pub fn is_direct_op(i: &Ident) -> bool {
+    i.to_string().ends_with("DirectOp")
+}
+
+// checks if an operation is direct to root
+pub fn is_root_direct_op(i: &Ident, root_name: &str) -> bool {
+    let s = i.to_string();
+    s.starts_with(root_name) && s.ends_with("DirectOp")
 }
 
 impl ExpandingCommandRule {
     fn new(spaces: Vec<Ident>, ops: Vec<Ident>, flags: Vec<Flag>, params: Option<Type>) -> Self {
         Self {
-            bare_space: spaces.is_empty(),
-            bare_op: ops.is_empty(),
             spaces,
             ops,
             flags,
@@ -211,13 +218,12 @@ impl ExpandingCommandRule {
         });
     }
 
-    pub fn resolve_bare_scopes(&mut self, root_name: &str) {
+    pub fn resolve_direct_scopes(&mut self, root_name: &str) {
         match [self.spaces.is_empty(), self.ops.is_empty()] {
             [false, false] => (),
             [true, true] => {
-                let ident = bare_str_ident(root_name);
-                self.spaces.push(ident.clone());
-                self.ops.push(ident);
+                self.spaces.push(Ident::new(root_name, Span::call_site()));
+                self.ops.push(direct_from_str(root_name));
             }
             [true, false] => {
                 println!("nospace/op, {:?}|{:?}", self.spaces, self.ops);
@@ -226,19 +232,18 @@ impl ExpandingCommandRule {
             [false, true] => {
                 println!("nospace/op, {:?}|{:?}", self.spaces, self.ops);
                 self.spaces.iter().for_each(|s| {
-                    self.ops.push(bare_ident(s));
+                    self.ops.push(direct_from_ident(s));
                 });
             }
         }
     }
 
     pub fn expand(mut self) -> Vec<CommandRule> {
-        match [self.bare_space, self.bare_op] {
+        match [self.spaces.is_empty(), self.ops.is_empty()] {
             [true, true] => vec![CommandRule {
+                is_of_root: true,
                 flags: self.take_flags(),
                 params: self.params,
-                bare_space: self.bare_space,
-                bare_op: self.bare_op,
                 space: self.spaces.remove(0),
                 op: self.ops.remove(0),
             }],
@@ -248,9 +253,8 @@ impl ExpandingCommandRule {
                 ops.into_iter()
                     .map(|o| CommandRule {
                         op: o,
+                        is_of_root: true,
                         space: self.spaces[0].clone(),
-                        bare_op: self.bare_op,
-                        bare_space: self.bare_space,
                         flags: self.clone_flags(),
                         params: self.clone_params(),
                     })
@@ -262,10 +266,9 @@ impl ExpandingCommandRule {
                 spaces
                     .into_iter()
                     .map(|s| CommandRule {
-                        op: self.ops[0].clone(),
                         space: s,
-                        bare_op: self.bare_op,
-                        bare_space: self.bare_space,
+                        is_of_root: false,
+                        op: self.ops[0].clone(),
                         params: self.clone_params(),
                         flags: self.clone_flags(),
                     })
@@ -279,8 +282,7 @@ impl ExpandingCommandRule {
                     self.ops.iter().map(|o| CommandRule {
                         space: s.clone(),
                         op: o.clone(),
-                        bare_space: self.bare_space,
-                        bare_op: self.bare_op,
+                        is_of_root: false,
                         flags: self.clone_flags(),
                         params: self.clone_params(),
                     })

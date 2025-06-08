@@ -212,11 +212,11 @@ impl<'a> SpaceType<'a> {
     }
 
     fn is_space_bare(&self) -> bool {
-        self.ident.is_bare()
+        self.ident.is_direct()
     }
 
     fn is_op_bare(&self) -> bool {
-        self.variants.len() == 1 && self.variants.iter().all(|v| v.is_bare())
+        self.variants.len() == 1 && self.variants.iter().all(|v| v.is_direct())
     }
 
     fn render(self) -> TS2 {
