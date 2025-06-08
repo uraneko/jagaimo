@@ -33,7 +33,7 @@ jagaimo! {
     // t { s(history) |use_max| { use 453 as u32} }
 }
 
-struct Dimensions {
+pub struct Dimensions {
     x: u8,
     y: u8,
 }

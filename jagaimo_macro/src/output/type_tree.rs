@@ -15,8 +15,6 @@ use crate::input::Flag;
 #[derive(Debug, Clone)]
 pub struct TypeTree<'a> {
     root: RootType<'a>,
-    spaces: Vec<SpaceType<'a>>,
-    ops: Vec<OpType<'a>>,
 }
 
 // WARN space and op names are always there because every command needs a space and op names/ids for
@@ -27,73 +25,59 @@ impl<'a> TypeTree<'a> {
     pub fn new(tcmd: Vec<TokenizedCommand<'a>>, root_name: &str) -> Self {
         let mut iter = tcmd.into_iter();
         let mut spaces: HashMap<&Ident, SpaceType<'_>> = HashMap::new();
-        let mut ops: HashMap<&Ident, OpType<'_>> = HashMap::new();
         while let Some(cmd) = iter.next() {
             let space = cmd.space_cloned();
             let ident = space.ident().unwrap();
-            let op = cmd.op_cloned();
 
             if !spaces.contains(ident) {
                 spaces.register(space);
             }
-            spaces.update(ident, op);
 
-            let ident = cmd.op().ident().unwrap();
-            ops.register(cmd.op_cloned());
+            let mut op = OpType::new(cmd.op_cloned());
 
             if let Some(flags) = cmd.flags_cloned() {
-                flags.into_iter().for_each(|f| ops.update(ident, f))
+                flags.into_iter().for_each(|f| op.insert_flag(f))
             };
 
             if let Some(params) = cmd.params_cloned() {
-                ops.update(ident, params);
+                op.set_params(params);
             }
-            // match cmd {
-            //     // command is a space operation
-            //     // some space's named command
-            //     tc if tc.is_space_op() => {}
-            //     // command is a space bare command
-            //     // some space's bare command
-            //     tc if tc.is_space() => {}
-            //     // command is an bare operation command
-            //     // root bare command
-            //     tc if tc.is_op() => {}
-            //     // command is somethig else, unreachable
-            //     _ => panic!(),
-            // }
+
+            // This inserts a full op type into a space with ident Ident
+            spaces.update(ident, op);
         }
 
-        let root_name = Ident::new(root_name, Span::call_site());
-        let root_variants = spaces.clone().into_keys().collect();
+        let root_ident = Ident::new(root_name, Span::call_site());
+
+        let root_ops = spaces.remove(&root_ident);
+        let root_direct_op = root_ops.clone().map(|spc| spc.direct_op);
+        let root_ops = root_ops.map(|spc| spc.ops);
+
+        let root_spaces = spaces.into_values().collect::<Vec<SpaceType>>();
+
         let root = RootType {
-            ident: root_name,
-            variants: root_variants,
+            ident: root_ident,
+            spaces: root_spaces,
+            ops: root_ops.unwrap_or(Vec::new()),
+            direct_op: root_direct_op.unwrap_or(None),
         };
 
-        let spaces = spaces.into_values().collect();
-        let ops = ops.into_values().collect();
-
-        Self { root, spaces, ops }
+        Self { root }
     }
 
     pub fn render(self) -> TS2 {
         let root = self.root.render();
-        let spaces = self.spaces.into_iter().map(|s| s.render());
-        let ops = self.ops.into_iter().map(|o| o.render());
 
         quote! {
             #root
-
-            #(#spaces)*
-
-            #(#ops)*
         }
     }
 }
 
-trait TypeTreeExt<'a, T>
+trait TypeTreeExt<'a, T, C>
 where
     T: 'a,
+    C: 'a,
 {
     fn contains(&self, ident: &Ident) -> bool;
 
@@ -109,58 +93,37 @@ where
     //
     // this function only inserts new variants into the given ident's
     // spacetype
-    fn update(&mut self, ident: &Ident, variant: AliasedToken<'a>);
+    fn update(&mut self, ident: &Ident, variant: C);
 }
 
-impl<'a> TypeTreeExt<'a, SpaceType<'a>> for HashMap<&'a Ident, SpaceType<'a>> {
+impl<'a> TypeTreeExt<'a, SpaceType<'a>, OpType<'a>> for HashMap<&'a Ident, SpaceType<'a>> {
     fn contains(&self, ident: &Ident) -> bool {
         self.contains_key(ident)
     }
 
-    fn register(&mut self, ident: AliasedToken<'a>) {
-        let i = ident.ident().unwrap();
+    fn register(&mut self, token: AliasedToken<'a>) {
+        let i = token.ident().unwrap();
         _ = self.insert(
             i,
             SpaceType {
-                ident,
-                variants: HashSet::new(),
+                token,
+                direct_op: None,
+                ops: Vec::new(),
             },
         );
     }
 
-    fn update(&mut self, ident: &Ident, variant: AliasedToken<'a>) {
-        self.get_mut(ident).map(|st| st.insert(variant));
-    }
-}
-
-impl<'a> TypeTreeExt<'a, OpType<'a>> for HashMap<&'a Ident, OpType<'a>> {
-    fn contains(&self, ident: &Ident) -> bool {
-        self.contains_key(ident)
-    }
-
-    fn register(&mut self, ident: AliasedToken<'a>) {
-        let i = ident.ident().unwrap();
-        _ = self.insert(
-            i,
-            OpType {
-                ident,
-                fields: HashSet::new(),
-                params: None,
-            },
-        );
-    }
-
-    fn update(&mut self, ident: &Ident, token: AliasedToken<'a>) {
-        if token.is_space() || token.is_op() {
-            // TODO error
-            return;
-        }
-
-        self.get_mut(ident).map(|ot| {
-            if token.is_flag() {
-                ot.insert_flag(token);
+    fn update(&mut self, ident: &Ident, op: OpType<'a>) {
+        self.get_mut(ident).map(|st| {
+            if op
+                .token
+                .ident()
+                .map(|i| i.to_string().ends_with("DirectOp"))
+                .unwrap()
+            {
+                st.set_direct(op);
             } else {
-                ot.set_params(token)
+                st.insert(op);
             }
         });
     }
@@ -169,117 +132,305 @@ impl<'a> TypeTreeExt<'a, OpType<'a>> for HashMap<&'a Ident, OpType<'a>> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RootType<'a> {
     ident: Ident,
-    variants: Vec<&'a Ident>,
-    // ident: Ident
-    // spaces: Vec<SpaceType>
-    // ops: Vec<OpType>
-    // direct_op: Option<OpType>
+    spaces: Vec<SpaceType<'a>>,
+    ops: Vec<OpType<'a>>,
+    direct_op: Option<OpType<'a>>,
 }
 
 impl RootType<'_> {
     fn render(self) -> TS2 {
         let ident = self.ident;
-        let mut variants = self.variants;
+        let count =
+            self.spaces.len() + self.ops.len() + if self.direct_op.is_some() { 1 } else { 0 };
 
-        if variants.len() == 1 {
-            let variant = variants.pop().unwrap();
-            quote! {
-                struct #ident (#variant);
+        let root = if count == 1 {
+            if let Some(op) = self.direct_op {
+                let op = op.render_fields();
+
+                println!("0-0");
+                return quote! {
+                    struct #ident {
+                        #op
+                    }
+                };
+            } else if self.spaces.len() == 1 {
+                let [module, field] = self
+                    .spaces
+                    .into_iter()
+                    .next()
+                    .map(|s| {
+                        [s.clone().render(), {
+                            let module = s.module_name();
+                            let ident = s.token.ident().unwrap();
+
+                            quote! {
+                                #module: #module :: #ident
+                            }
+                        }]
+                    })
+                    .unwrap();
+
+                println!("0-1");
+                return quote! {
+                    pub struct #ident {
+                        #field
+                    }
+
+                    #module
+                };
+            } else {
+                let op = self
+                    .ops
+                    .into_iter()
+                    .next()
+                    .map(|op| op.render_fields())
+                    .unwrap();
+
+                println!("0-2");
+                return quote! {
+                    pub struct #ident {
+                        #op
+                    }
+                };
             }
         } else {
-            let variants = variants.into_iter().map(|v| quote! {#v ( #v ) });
-            quote! {
-                enum #ident {
-                    #(#variants,)*
+            let direct_variant = self
+                .direct_op
+                .clone()
+                .map(|op| (op.token.ident(), op.render_fields()))
+                .map(|(i, f)| quote! { #i { #f }})
+                .inspect(|ts| println!(">>>>>>>>\n\n{}\n\n<<<<<<<<<", ts));
+            let direct = self.direct_op.map(|op| op.render());
+
+            let op_variants = self
+                .ops
+                .clone()
+                .into_iter()
+                .map(|op| op.token.ident())
+                .map(|i| quote! { #i ( #i ) });
+            let ops = self.ops.into_iter().map(|op| op.render());
+
+            let space_variants = self
+                .spaces
+                .clone()
+                .into_iter()
+                .map(|scp| scp.render_variant());
+            let spaces = self
+                .spaces
+                .into_iter()
+                .map(|spc| spc.render())
+                .inspect(|ts| println!("{}", ts));
+
+            println!("1");
+            return quote! {
+                pub enum #ident {
+                    #(#space_variants,)*
+                    #(#op_variants,)*
+                    #direct_variant
                 }
-            }
-        }
+
+                #(#ops)*
+
+                #(#spaces)*
+            };
+        };
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SpaceType<'a> {
-    ident: AliasedToken<'a>,
-    variants: HashSet<AliasedToken<'a>>,
-    // ident: AliasedToken<'a>,
-    // ops: Vec<OpType>,
-    // direct_op: Option<OpType>
+    token: AliasedToken<'a>,
+    ops: Vec<OpType<'a>>,
+    direct_op: Option<OpType<'a>>,
 }
 
 impl<'a> SpaceType<'a> {
-    fn insert(&mut self, variant: AliasedToken<'a>) {
-        _ = self.variants.insert(variant);
+    fn insert(&mut self, op: OpType<'a>) {
+        _ = self.ops.push(op);
     }
 
-    fn is_space_bare(&self) -> bool {
-        self.ident.is_direct()
+    fn set_direct(&mut self, op: OpType<'a>) {
+        self.direct_op = Some(op);
     }
 
-    fn is_op_bare(&self) -> bool {
-        self.variants.len() == 1 && self.variants.iter().all(|v| v.is_direct())
+    fn is_space_direct(&self) -> bool {
+        self.token.is_direct()
+    }
+
+    fn is_op_direct(&self) -> bool {
+        self.token.is_root() && self.direct_op.is_some()
+    }
+
+    fn module_name(&self) -> Ident {
+        let s = self.token.ident().unwrap().to_string();
+        Ident::new(
+            &s.chars()
+                .enumerate()
+                .map(|(i, c)| {
+                    if c.is_ascii_uppercase() {
+                        if i == 0 {
+                            String::from(c.to_ascii_lowercase())
+                        } else {
+                            let mut s = String::from("_");
+                            s.push(c.to_ascii_lowercase());
+                            s
+                        }
+                    } else {
+                        String::from(c)
+                    }
+                })
+                .fold(String::new(), |acc, s| acc + &s),
+            Span::call_site(),
+        )
+    }
+
+    fn render_variant(self) -> TS2 {
+        let module_name = self.module_name();
+        let mut ident = self.token.ident().unwrap().clone();
+
+        if self.ops.len() == 1 {
+            ident = Ident::new(
+                &(ident.to_string()
+                    + &self
+                        .ops
+                        .into_iter()
+                        .next()
+                        .unwrap()
+                        .token
+                        .ident()
+                        .unwrap()
+                        .to_string()),
+                Span::call_site(),
+            );
+        }
+
+        quote! {
+            #ident ( #module_name :: #ident )
+        }
     }
 
     fn render(self) -> TS2 {
-        let is_bare = self.is_op_bare() || self.is_space_bare();
-        let ident = self.ident.ident().unwrap();
-        let mut variants = self.variants.into_iter().map(|atok| atok.ident().unwrap());
+        let ident = self.token.ident().unwrap();
+        let mod_ident = self.module_name();
 
-        if variants.len() == 1 {
-            let variant = variants.next().unwrap();
-            if is_bare {
-                quote! {}
+        let op_count = if self.direct_op.is_some() { 1 } else { 0 } + self.ops.len();
+        let space_type = if op_count == 1 {
+            let (op, ident) = if let Some(op) = self.direct_op {
+                (op, ident.clone())
             } else {
-                quote! {
-                    struct #ident (#variant);
+                let op = self.ops.into_iter().next().unwrap();
+                let ident = Ident::new(
+                    &(ident.to_string() + &op.token.ident().unwrap().to_string()),
+                    Span::call_site(),
+                );
+                (op, ident)
+            };
+            let fields = op.render_fields();
+            // TODO let ident = ident + op ident ;
+            quote! {
+                pub struct #ident {
+                    #fields
                 }
             }
         } else {
-            let variants = variants.into_iter().map(|v| quote! {#v ( #v ) });
+            let direct_variant = self
+                .direct_op
+                .clone()
+                .map(|op| op.token.ident())
+                .map(|i| quote! { #i ( #i )});
+            let direct = self.direct_op.map(|op| op.render());
+
+            let op_variants = self
+                .ops
+                .clone()
+                .into_iter()
+                .map(|op| op.token.ident())
+                .map(|i| quote! { #i ( #i ) });
+            let ops = self.ops.into_iter().map(|op| op.render());
+
             quote! {
-                enum #ident {
-                    #(#variants,)*
+                pub enum #ident {
+                    #(#op_variants,)*
+                    #direct_variant
+
                 }
+
+                    #(#ops)*
+
+                    #direct
+
+            }
+        };
+
+        quote! {
+            pub mod #mod_ident {
+                #space_type
             }
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OpType<'a> {
-    ident: AliasedToken<'a>,
-    fields: HashSet<AliasedToken<'a>>,
+    token: AliasedToken<'a>,
+    fields: Vec<AliasedToken<'a>>,
     params: Option<AliasedToken<'a>>,
 }
 
 impl<'a> OpType<'a> {
+    fn new(atok: AliasedToken<'a>) -> Self {
+        Self {
+            token: atok,
+            fields: Vec::new(),
+            params: None,
+        }
+    }
+
     fn insert_flag(&mut self, field: AliasedToken<'a>) {
-        _ = self.fields.insert(field);
+        _ = self.fields.push(field);
     }
 
     fn set_params(&mut self, params: AliasedToken<'a>) {
         _ = self.params = Some(params);
     }
 
-    fn render(self) -> TS2 {
-        let ident = self.ident.ident().unwrap();
-        let fields = self.fields.into_iter().map(|f| {
-            let flag = f.flag().unwrap();
-            let ident = flag.ident();
-            let ty = flag
-                .ty()
-                .map(|ty| quote! { #ty })
-                .unwrap_or_else(|| quote! { bool });
+    fn render_fields(self) -> TS2 {
+        let fields = self.fields.into_iter().map(|atok| {
+            let f = atok.flag().unwrap();
+            let ident = f.ident();
+            let fallback = Type::Verbatim("bool".parse().unwrap());
+            let ty = f.ty().unwrap_or(&fallback);
 
             quote! { #ident: #ty  }
         });
-
-        let params = self
-            .params
-            .map(|p| p.ty().unwrap())
-            .map(|ty| quote! { params: #ty });
+        let params = self.params.map(|atok| {
+            let ty = atok.ty();
+            quote! { params: #ty }
+        });
 
         quote! {
-            struct #ident {
+            #(#fields,)*
+            #params
+        }
+    }
+
+    fn render(self) -> TS2 {
+        let ident = self.token.ident();
+        let fields = self.fields.into_iter().map(|atok| {
+            let f = atok.flag().unwrap();
+            let ident = f.ident();
+            let fallback = Type::Verbatim("bool".parse().unwrap());
+            let ty = f.ty().unwrap_or(&fallback);
+
+            quote! { #ident: #ty  }
+        });
+        let params = self.params.map(|atok| {
+            let ty = atok.ty();
+            quote! { params: #ty }
+        });
+
+        quote! {
+            pub struct #ident {
                 #(#fields,)*
                 #params
             }

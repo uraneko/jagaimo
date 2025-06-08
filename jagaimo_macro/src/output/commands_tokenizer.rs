@@ -183,6 +183,14 @@ impl<'a> AliasedToken<'a> {
         true
     }
 
+    pub fn is_root(&self) -> bool {
+        let Self::Space { is_root, .. } = self else {
+            return false;
+        };
+
+        *is_root
+    }
+
     pub fn is_direct(&self) -> bool {
         match self {
             Self::Space { is_root, .. } => *is_root,
@@ -329,61 +337,62 @@ impl<'a> From<TokenizedCommand<'a>> for Vec<AliasedToken<'a>> {
     }
 }
 
-impl std::fmt::Display for AliasedToken<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        use quote::ToTokens;
-        compile_error!("this panic! with a SIGSEGV");
-
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Space {
-                    space,
-                    alias,
-                    is_root,
-                } =>
-                    if *is_root {
-                        "".into()
-                    } else {
-                        format!(
-                            "{}{}",
-                            space,
-                            if let Some(a) = alias {
-                                format!("({})", a)
-                            } else {
-                                "".into()
-                            }
-                        )
-                    },
-                Self::Operation { op, alias } =>
-                    if self.is_direct() {
-                        "".into()
-                    } else {
-                        format!(
-                            "{}{}",
-                            op,
-                            if let Some(a) = alias {
-                                format!("({})", a)
-                            } else {
-                                "".into()
-                            }
-                        )
-                    },
-                Self::Flag { flag, alias } => format!(
-                    "{}{}",
-                    flag,
-                    if let Some(a) = alias {
-                        format!("({})", a)
-                    } else {
-                        "".into()
-                    }
-                ),
-                Self::Params(ty) => format!("{}", ty.to_token_stream().to_string()),
-            }
-        )
-    }
-}
+// BUG this panics! with a SIGSEGV
+// impl std::fmt::Display for AliasedToken<'_> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         use quote::ToTokens;
+//         compile_error!("this panics! with a SIGSEGV");
+//
+//         write!(
+//             f,
+//             "{}",
+//             match self {
+//                 Self::Space {
+//                     space,
+//                     alias,
+//                     is_root,
+//                 } =>
+//                     if *is_root {
+//                         "".into()
+//                     } else {
+//                         format!(
+//                             "{}{}",
+//                             space,
+//                             if let Some(a) = alias {
+//                                 format!("({})", a)
+//                             } else {
+//                                 "".into()
+//                             }
+//                         )
+//                     },
+//                 Self::Operation { op, alias } =>
+//                     if self.is_direct() {
+//                         "".into()
+//                     } else {
+//                         format!(
+//                             "{}{}",
+//                             op,
+//                             if let Some(a) = alias {
+//                                 format!("({})", a)
+//                             } else {
+//                                 "".into()
+//                             }
+//                         )
+//                     },
+//                 Self::Flag { flag, alias } => format!(
+//                     "{}{}",
+//                     flag,
+//                     if let Some(a) = alias {
+//                         format!("({})", a)
+//                     } else {
+//                         "".into()
+//                     }
+//                 ),
+//                 Self::Params(ty) => format!("{}", ty.to_token_stream().to_string()),
+//             }
+//         )
+//     }
+// }
 
 impl std::fmt::Display for TokenizedCommand<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -391,25 +400,25 @@ impl std::fmt::Display for TokenizedCommand<'_> {
             f,
             "S:{} O:{} F:{:?} P:{}",
             if !self.space.is_direct() {
-                format!("{}", self.space)
+                format!("{:?}", self.space)
             } else {
                 "".into()
             },
             if !self.op.is_direct() {
-                format!("{}", self.op)
+                format!("{:?}", self.op)
             } else {
                 "".into()
             },
             if let Some(flags) = &self.flags {
                 flags
                     .into_iter()
-                    .map(|f| format!("{}", f))
+                    .map(|f| format!("{:?}", f))
                     .fold(String::new(), |acc, s| acc + " " + &s)
             } else {
                 "".into()
             },
             if let Some(params) = &self.params {
-                format!("{}", params)
+                format!("{:?}", params)
             } else {
                 "".into()
             }
