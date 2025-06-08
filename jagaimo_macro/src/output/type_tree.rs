@@ -7,6 +7,11 @@ use syn::{Ident, Type};
 use super::{AliasedToken, TokenizedCommand};
 use crate::input::Flag;
 
+// TODO instead of fixing operations naming conflicts
+// should use a module for every space
+// that way op names can be duplicated
+// and generated code structure would be clearer
+
 #[derive(Debug, Clone)]
 pub struct TypeTree<'a> {
     root: RootType<'a>,
@@ -14,32 +19,6 @@ pub struct TypeTree<'a> {
     ops: Vec<OpType<'a>>,
 }
 
-// TODO when bare resolution is handled after parsing macro input
-// operation name conflicts should also be handled
-// i.e., given 2 command rules
-// s(history) o(view) ....
-// s(collections) o(view) ...
-// s(hosts) o(view)
-//
-// 3 possible cases
-// * all view ops have different contexts
-// -> each op is renamed to space_name_op_name
-// <- this way, they are treated as different ops in type tree generation
-// * all view ops have the same contexts
-// -> no additional work is done
-// <- all 3 ops are treated as the same op in type tree generation
-// * most (2) of the 3 ops have the same context
-// -> the 2 that  have the same context are left as is
-// and the unique one is renamed to space_name_op_name
-// <- this way name conflicts are avoided in the type tree
-
-// TODO need special handling for fully bare scope
-// -> if space == op
-// -> space is a redundant op name
-// there is no space but an op for the root space
-//
-// TODO spaceless operations all belong to root space
-//
 // WARN space and op names are always there because every command needs a space and op names/ids for
 // its states to be reprensented in the type tree
 //  but when figuring the space and op of a command
@@ -191,6 +170,10 @@ impl<'a> TypeTreeExt<'a, OpType<'a>> for HashMap<&'a Ident, OpType<'a>> {
 pub struct RootType<'a> {
     ident: Ident,
     variants: Vec<&'a Ident>,
+    // ident: Ident
+    // spaces: Vec<SpaceType>
+    // ops: Vec<OpType>
+    // direct_op: Option<OpType>
 }
 
 impl RootType<'_> {
@@ -204,6 +187,7 @@ impl RootType<'_> {
                 struct #ident (#variant);
             }
         } else {
+            let variants = variants.into_iter().map(|v| quote! {#v ( #v ) });
             quote! {
                 enum #ident {
                     #(#variants,)*
@@ -217,6 +201,9 @@ impl RootType<'_> {
 pub struct SpaceType<'a> {
     ident: AliasedToken<'a>,
     variants: HashSet<AliasedToken<'a>>,
+    // ident: AliasedToken<'a>,
+    // ops: Vec<OpType>,
+    // direct_op: Option<OpType>
 }
 
 impl<'a> SpaceType<'a> {
@@ -224,18 +211,30 @@ impl<'a> SpaceType<'a> {
         _ = self.variants.insert(variant);
     }
 
+    fn is_space_bare(&self) -> bool {
+        self.ident.is_bare()
+    }
+
+    fn is_op_bare(&self) -> bool {
+        self.variants.len() == 1 && self.variants.iter().all(|v| v.is_bare())
+    }
+
     fn render(self) -> TS2 {
-        println!("1");
+        let is_bare = self.is_op_bare() || self.is_space_bare();
         let ident = self.ident.ident().unwrap();
         let mut variants = self.variants.into_iter().map(|atok| atok.ident().unwrap());
 
         if variants.len() == 1 {
             let variant = variants.next().unwrap();
-            println!("1");
-            quote! {
-                struct #ident (#variant);
+            if is_bare {
+                quote! {}
+            } else {
+                quote! {
+                    struct #ident (#variant);
+                }
             }
         } else {
+            let variants = variants.into_iter().map(|v| quote! {#v ( #v ) });
             quote! {
                 enum #ident {
                     #(#variants,)*
@@ -262,10 +261,8 @@ impl<'a> OpType<'a> {
     }
 
     fn render(self) -> TS2 {
-        println!("2");
         let ident = self.ident.ident().unwrap();
         let fields = self.fields.into_iter().map(|f| {
-            println!("{}", f);
             let flag = f.flag().unwrap();
             let ident = flag.ident();
             let ty = flag
@@ -281,7 +278,6 @@ impl<'a> OpType<'a> {
             .map(|p| p.ty().unwrap())
             .map(|ty| quote! { params: #ty });
 
-        println!("2");
         quote! {
             struct #ident {
                 #(#fields,)*

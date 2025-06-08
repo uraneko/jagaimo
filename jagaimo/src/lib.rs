@@ -6,7 +6,7 @@ jagaimo! {
         no_version,
         nu_cmp,
         fish_cmp,
-        root_name = "jagaimo_oishii_desu",
+        root_name = "jagaimo_n",
         // ignore_naming_conventions,
         // no_auto_alias,
         derives(Debug, Clone),
@@ -22,7 +22,10 @@ jagaimo! {
     c { [ <(String, f64)> size<Dimensions> show_all ] }
     c { s(collections) o(obfuscate) [ <std::fs::File> allocate  rand<f64> hash<String> fuzzing algorithm<String> ] }
     c { o(view) [ list_all theme<String> ] }
+    c { o(distribute) }
     c { s(collections) o(list) [ <Vec<f64>> long pipe_into_list_of<String> output_file<std::fs::File> ] }
+
+
     // t { s(colls) o(list) |_ base: String|
     //         { if base == "_" { auto as bool } else { base "BASE{base}" as Base } }
     // }

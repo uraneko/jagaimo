@@ -99,10 +99,14 @@ impl Rules {
         // check context equality
         // and change op names when required
         while let Some(group) = iter.next() {
+            println!("group");
+            group
+                .iter()
+                .map(|cr| (cr.space(), cr.op()))
+                .for_each(|(spc, op)| println!("{} -> {}", spc, op));
             // for now we simply stick to checking if all contexts are equal
             // if so then nothing is done
             // otherwise we prefix all operations names with their spaces
-            println!("????{:?}????", group.len());
             if group.len() == 1 || group.iter().all(|cr| cr.context() == group[0].context()) {
                 self.cmd.extend(group);
             } else {
