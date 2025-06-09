@@ -117,7 +117,7 @@ impl From<&Effect> for &str {
 }
 
 impl Styled {
-    pub fn color(&mut self, clr: impl Into<Color>) -> &mut Self {
+    pub fn color(mut self, clr: impl Into<Color>) -> Self {
         self.color = clr.into();
 
         self
@@ -134,69 +134,119 @@ impl Styled {
             .fold(String::new(), |acc, e| acc + ";" + e)
     }
 
-    pub fn insert(&mut self, efct: impl Into<Effect>) -> &mut Self {
+    pub fn effect(mut self, efct: impl Into<Effect>) -> Self {
         self.effects.insert(efct.into());
 
         self
     }
 
-    pub fn remove(&mut self, efct: impl Into<Effect>) -> &mut Self {
+    pub fn effects<T, I>(mut self, efcts: T) -> Self
+    where
+        T: IntoIterator<Item = I>,
+        I: Into<Effect>,
+    {
+        efcts.into_iter().for_each(|e| {
+            self.effects.insert(e.into());
+        });
+
+        self
+    }
+
+    pub fn remove(mut self, efct: impl Into<Effect>) -> Self {
         self.effects.remove(&efct.into());
 
         self
     }
 
-    pub fn content(&mut self, content: impl Into<String>) -> &mut Self {
-        self.content = content.into();
-
-        self
-    }
-
-    pub fn content_as_str(&self) -> &str {
-        &self.content
-    }
-
-    pub fn fmt(&self) -> String {
+    pub fn fmt(&self, content: impl AsRef<str>) -> String {
         format!(
             "\x1b[{}{}m{}\x1b[0m",
             self.color_as_str(),
             self.effects_to_string(),
-            self.content_as_str()
+            content.as_ref()
         )
     }
 }
 
-pub trait Help {
-    // wrapper around the other methods
-    // finishes after calling format
-    fn help(&self) -> String;
+fn gen_delim(k: &mut String) {
+    let len = k.len();
+    let delim = 20 - len;
+    k.push_str(&(0..delim).into_iter().map(|_| ' ').collect::<String>());
+}
 
+fn format_table(t: HashMap<String, String>, stl: &mut Styled) -> String {
+    t.into_iter()
+        .map(|(k, v)| (stl.fmt(k), v))
+        .map(|(mut k, v)| {
+            gen_delim(&mut k);
+            k + &v
+        })
+        .fold(String::new(), |acc, l| acc + &l + "\n")
+}
+
+pub trait Help {
     // formats the entire help message of self
     // and returns it
-    fn format(&self) -> String;
+    fn help() -> String {
+        let stls = Self::styles();
+        let hdr = stls.get("hdr").unwrap();
+        let desc = Self::description();
+        let links = Self::links(&stls).unwrap_or("".into());
+        let usage = Self::usage(&stls);
+        let spaces = Self::spaces(&stls)
+            .map(|s| hdr.fmt("Spaces:") + &s)
+            .unwrap_or("".into());
+        let ops = Self::ops(&stls)
+            .map(|s| hdr.fmt("Operations:") + &s)
+            .unwrap_or("".into());
+        let flags = Self::flags(&stls)
+            .map(|s| hdr.fmt("Flags:") + &s)
+            .unwrap_or("".into());
+
+        format!(
+            "{}\n\n{}\n\n{}\n\n{}\n\n{}\n\n{}",
+            desc, links, usage, flags, ops, spaces
+        )
+    }
+
+    fn styles() -> HashMap<&'static str, Styled> {
+        HashMap::from([
+            ("base", Styled::default().color("y").effects(["b", "ul"])),
+            ("flag", Styled::default().color("r").effect("b")),
+            ("op", Styled::default().color("g").effect("b")),
+            ("space", Styled::default().color("blue").effect("bold")),
+            ("clear", Styled::default().effect("clear")),
+            ("hdr", Styled::default().color("mgnt").effects(["b", "itl"])),
+        ])
+    }
 
     // returns the usage string of this scope
-    fn usage(&self) -> String;
+    fn usage(stls: &HashMap<&str, Styled>) -> String;
 
     // returns the url links provided in self's help message
-    fn links(&self) -> String;
+    fn links(stls: &HashMap<&str, Styled>) -> Option<String> {
+        None
+    }
 
-    // self's name + scope
-    // e.g.,
-    // collections space
-    // view operation
-    // jagaimo cli
-    fn named_scope(&self) -> String;
+    fn flags(stls: &HashMap<&str, Styled>) -> Option<String> {
+        None
+    }
+
+    fn ops(stls: &HashMap<&str, Styled>) -> Option<String> {
+        None
+    }
+
+    fn spaces(stls: &HashMap<&str, Styled>) -> Option<String> {
+        None
+    }
 
     // returns the description of this scope, if any
     // if none then defaults to returning self.named_scope()
-    fn description(&self) -> String {
-        self.named_scope()
-    }
+    fn description() -> String;
 
     // returns the cli tool version
     // returns option because version only makes sense on the root namespace
-    fn version(&self) -> Option<String> {
+    fn version() -> Option<String> {
         None
     }
 }
@@ -206,24 +256,24 @@ pub fn read_help() -> toml::Table {
 }
 
 pub struct RootHelp {
-    links: Option<HashMap<String, String>>,
-    description: String,
-    spaces: Option<HashMap<String, String>>,
-    ops: Option<HashMap<String, String>>,
-    flags: Option<HashMap<String, String>>,
+    pub links: Option<HashMap<String, String>>,
+    pub description: String,
+    pub spaces: Option<HashMap<String, String>>,
+    pub ops: Option<HashMap<String, String>>,
+    pub flags: Option<HashMap<String, String>>,
 }
 
 pub struct SpaceHelp {
-    links: Option<HashMap<String, String>>,
-    description: String,
-    ops: Option<HashMap<String, String>>,
-    flags: Option<HashMap<String, String>>,
+    pub links: Option<HashMap<String, String>>,
+    pub description: String,
+    pub ops: Option<HashMap<String, String>>,
+    pub flags: Option<HashMap<String, String>>,
 }
 
 pub struct OpHelp {
-    links: Option<HashMap<String, String>>,
-    description: String,
-    flags: Option<HashMap<String, String>>,
+    pub links: Option<HashMap<String, String>>,
+    pub description: String,
+    pub flags: Option<HashMap<String, String>>,
 }
 
 pub trait ExtractHelp<T> {
@@ -249,7 +299,7 @@ pub trait ExtractHelp<T> {
 }
 
 // FIXME this needs to be in snake case
-struct Excavator<'a, T> {
+pub struct Excavator<'a, T> {
     toml: &'a toml::Table,
     space: Option<&'a Ident>,
     op: Option<&'a Ident>,
@@ -257,7 +307,7 @@ struct Excavator<'a, T> {
 }
 
 impl<'a, T> Excavator<'a, T> {
-    fn new(space: Option<&'a Ident>, op: Option<&'a Ident>, toml: &'a toml::Table) -> Self {
+    pub fn new(space: Option<&'a Ident>, op: Option<&'a Ident>, toml: &'a toml::Table) -> Self {
         Self {
             toml,
             space,

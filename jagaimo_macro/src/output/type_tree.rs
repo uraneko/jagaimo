@@ -5,8 +5,8 @@ use quote::quote;
 use syn::{Ident, Type};
 use toml::Table;
 
+use super::help::{Excavator, ExtractHelp, Help, OpHelp, RootHelp, SpaceHelp};
 use super::{AliasedToken, TokenizedCommand};
-use crate::resolve_crate::ResolveCrate;
 
 // TODO instead of fixing operations naming conflicts
 // should use a module for every space
@@ -140,6 +140,10 @@ pub struct RootType<'a> {
 
 impl RootType<'_> {
     fn help(&self, toml: &Table) -> TS2 {
+        let excav = Excavator::<RootHelp>::new(None, None, toml);
+        let help = excav.extract();
+
+        // version
         quote! {
             fn version() -> Option<String> {
                 let [mut name, version] = ResolveCrate::new().read_manifest().crate_name_version();
