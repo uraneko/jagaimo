@@ -1,5 +1,15 @@
 use jagaimo_macro::jagaimo;
 
+pub trait Help {
+    fn help(&self);
+
+    fn format(&self);
+
+    fn usage(&self);
+
+    fn description(&self);
+}
+
 jagaimo! {
 
     #[

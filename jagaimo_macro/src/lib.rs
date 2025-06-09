@@ -54,7 +54,7 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
 
     // quote! {}.into()
 
-    rules.type_tree_renderer(attrs.root_name()).into()
+    rules.type_tree_renderer(attrs.root_name(), attrs.derives()).into()
 }
 
 // output

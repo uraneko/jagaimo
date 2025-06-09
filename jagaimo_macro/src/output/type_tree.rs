@@ -65,8 +65,8 @@ impl<'a> TypeTree<'a> {
         Self { root }
     }
 
-    pub fn render(self) -> TS2 {
-        let root = self.root.render();
+    pub fn render(self, derives: &[Ident]) -> TS2 {
+        let root = self.root.render(derives);
 
         quote! {
             #root
@@ -138,7 +138,7 @@ pub struct RootType<'a> {
 }
 
 impl RootType<'_> {
-    fn render(self) -> TS2 {
+    fn render(self, derives: &[Ident]) -> TS2 {
         let ident = self.ident;
         let count =
             self.spaces.len() + self.ops.len() + if self.direct_op.is_some() { 1 } else { 0 };
@@ -149,6 +149,7 @@ impl RootType<'_> {
 
                 println!("0-0");
                 return quote! {
+                    # [derive( #(#derives,)* )]
                     struct #ident {
                         #op
                     }
@@ -159,7 +160,7 @@ impl RootType<'_> {
                     .into_iter()
                     .next()
                     .map(|s| {
-                        [s.clone().render(), {
+                        [s.clone().render(derives), {
                             let module = s.module_name();
                             let ident = s.token.ident().unwrap();
 
@@ -172,6 +173,7 @@ impl RootType<'_> {
 
                 println!("0-1");
                 return quote! {
+                    # [derive( #(#derives,)* )]
                     pub struct #ident {
                         #field
                     }
@@ -188,6 +190,7 @@ impl RootType<'_> {
 
                 println!("0-2");
                 return quote! {
+                    # [derive( #(#derives,)* )]
                     pub struct #ident {
                         #op
                     }
@@ -198,9 +201,8 @@ impl RootType<'_> {
                 .direct_op
                 .clone()
                 .map(|op| (op.token.ident(), op.render_fields()))
-                .map(|(i, f)| quote! { #i { #f }})
-                .inspect(|ts| println!(">>>>>>>>\n\n{}\n\n<<<<<<<<<", ts));
-            let direct = self.direct_op.map(|op| op.render());
+                .map(|(i, f)| quote! { #i { #f }});
+            let direct = self.direct_op.map(|op| op.render(derives));
 
             let op_variants = self
                 .ops
@@ -208,7 +210,7 @@ impl RootType<'_> {
                 .into_iter()
                 .map(|op| op.token.ident())
                 .map(|i| quote! { #i ( #i ) });
-            let ops = self.ops.into_iter().map(|op| op.render());
+            let ops = self.ops.into_iter().map(|op| op.render(derives));
 
             let space_variants = self
                 .spaces
@@ -218,11 +220,12 @@ impl RootType<'_> {
             let spaces = self
                 .spaces
                 .into_iter()
-                .map(|spc| spc.render())
+                .map(|spc| spc.render(derives))
                 .inspect(|ts| println!("{}", ts));
 
             println!("1");
             return quote! {
+                # [derive( #(#derives,)* )]
                 pub enum #ident {
                     #(#space_variants,)*
                     #(#op_variants,)*
@@ -288,7 +291,7 @@ impl<'a> SpaceType<'a> {
         self.ops.len() + if self.direct_op.is_some() { 1 } else { 0 } == 1
     }
 
-    fn render_variant(self) -> TS2 {
+    fn render_variant(self)-> TS2 {
         let module_name = self.module_name();
         let ident = self.token.ident().unwrap().clone();
 
@@ -320,7 +323,7 @@ impl<'a> SpaceType<'a> {
         }
     }
 
-    fn render(self) -> TS2 {
+    fn render(self, derives: &[Ident]) -> TS2 {
         let ident = self.token.ident().unwrap();
         let mod_ident = self.module_name();
 
@@ -342,6 +345,7 @@ impl<'a> SpaceType<'a> {
             let fields = op.render_fields();
             // TODO let ident = ident + op ident ;
             quote! {
+                #[derive( #(#derives,)* )]
                 pub struct #ident {
                     #fields
                 }
@@ -352,7 +356,7 @@ impl<'a> SpaceType<'a> {
                 .clone()
                 .map(|op| op.token.ident())
                 .map(|i| quote! { #i ( #i )});
-            let direct = self.direct_op.map(|op| op.render());
+            let direct = self.direct_op.map(|op| op.render(derives));
 
             let op_variants = self
                 .ops
@@ -360,9 +364,10 @@ impl<'a> SpaceType<'a> {
                 .into_iter()
                 .map(|op| op.token.ident())
                 .map(|i| quote! { #i ( #i ) });
-            let ops = self.ops.into_iter().map(|op| op.render());
+            let ops = self.ops.into_iter().map(|op| op.render(derives));
 
             quote! {
+                #[derive( #(#derives,)* )]
                 pub enum #ident {
                     #(#op_variants,)*
                     #direct_variant
@@ -428,7 +433,7 @@ impl<'a> OpType<'a> {
         }
     }
 
-    fn render(self) -> TS2 {
+    fn render(self, derives: &[Ident]) -> TS2 {
         let ident = self.token.ident();
         let fields = self.fields.into_iter().map(|atok| {
             let f = atok.flag().unwrap();
@@ -444,6 +449,7 @@ impl<'a> OpType<'a> {
         });
 
         quote! {
+            #[derive( #(#derives,)* )]
             pub struct #ident {
                 #(#fields,)*
                 #params

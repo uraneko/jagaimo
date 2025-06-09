@@ -141,8 +141,8 @@ impl Rules {
             .collect()
     }
 
-    pub fn type_tree_renderer(&self, root_name: &str) -> TS2 {
-        TypeTree::new(self.cmds_tokenizer(), root_name).render()
+    pub fn type_tree_renderer(&self, root_name: &str, derives: &[Ident]) -> TS2 {
+        TypeTree::new(self.cmds_tokenizer(), root_name).render(derives)
     }
 }
 
