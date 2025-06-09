@@ -1,15 +1,5 @@
 use jagaimo_macro::jagaimo;
 
-pub trait Help {
-    fn help(&self);
-
-    fn format(&self);
-
-    fn usage(&self);
-
-    fn description(&self);
-}
-
 jagaimo! {
 
     #[
@@ -31,10 +21,10 @@ jagaimo! {
     c { s(history) o(view) [ flatten encoding<String> max<u8> max<f64> ] }
     c { s(history) o(annotate) [ max<u8> verbose tags<Vec<String>> ] }
     c { [ <(String, f64)> size<Dimensions> show_all ] }
-    c { s(collections) o(obfuscate) [ <std::fs::File> allocate  rand<f64> hash<String> fuzzing algorithm<String> ] }
+    c { s(collections) o(obfuscate) [ <String> allocate  rand<f64> hash<String> fuzzing algorithm<String> ] }
     c { o(view) [ list_all theme<String> ] }
     c { o(distribute) }
-    c { s(collections) o(list) [ <Vec<f64>> long pipe_into_list_of<String> output_file<std::fs::File> ] }
+    c { s(collections) o(list) [ <Vec<f64>> long pipe_into_list_of<String> output_file<String> ] }
 
 
     // t { s(colls) o(list) |_ base: String|
@@ -43,6 +33,7 @@ jagaimo! {
     // t { s(history) |use_max| { use 453 as u32} }
 }
 
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub struct Dimensions {
     x: u8,
     y: u8,

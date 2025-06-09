@@ -7,10 +7,13 @@ mod output;
 mod resolve_crate;
 
 use input::parse_attrs_rules;
-use output::alias_generation::AliasGenerator;
 
 #[proc_macro]
 pub fn jagaimo(stream: TokenStream) -> TokenStream {
+    let map = &output::help::read_help()["descriptions"]["collections"]["add"];
+
+    panic!("{:#?}", map);
+
     // set parser fn that impl Parser trait
     let parser = parse_attrs_rules;
     // parse input using Parser::parse(TokenStream)
@@ -54,7 +57,11 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
 
     // quote! {}.into()
 
-    rules.type_tree_renderer(attrs.root_name(), attrs.derives()).into()
+    let table = output::help::read_help();
+
+    rules
+        .type_tree_renderer(attrs.root_name(), attrs.derives())
+        .into()
 }
 
 // output

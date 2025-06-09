@@ -3,9 +3,10 @@ use std::collections::{HashMap, HashSet};
 use proc_macro2::{Span, TokenStream as TS2};
 use quote::quote;
 use syn::{Ident, Type};
+use toml::Table;
 
 use super::{AliasedToken, TokenizedCommand};
-use crate::input::Flag;
+use crate::resolve_crate::ResolveCrate;
 
 // TODO instead of fixing operations naming conflicts
 // should use a module for every space
@@ -138,6 +139,19 @@ pub struct RootType<'a> {
 }
 
 impl RootType<'_> {
+    fn help(&self, toml: &Table) -> TS2 {
+        quote! {
+            fn version() -> Option<String> {
+                let [mut name, version] = ResolveCrate::new().read_manifest().crate_name_version();
+
+                name.push_str(" ");
+                name.push_str(&version);
+
+                Some(name)
+            }
+        }
+    }
+
     fn render(self, derives: &[Ident]) -> TS2 {
         let ident = self.ident;
         let count =
@@ -291,7 +305,7 @@ impl<'a> SpaceType<'a> {
         self.ops.len() + if self.direct_op.is_some() { 1 } else { 0 } == 1
     }
 
-    fn render_variant(self)-> TS2 {
+    fn render_variant(self) -> TS2 {
         let module_name = self.module_name();
         let ident = self.token.ident().unwrap().clone();
 
