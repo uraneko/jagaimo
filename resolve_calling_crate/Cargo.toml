@@ -10,3 +10,5 @@ path = "src/main.rs"
 [features]
 default = ["manifest"]
 manifest = []
+
+nightly = []
