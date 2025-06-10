@@ -3,8 +3,7 @@ use std::collections::{HashMap, HashSet};
 use syn::Ident;
 use toml::{Table, Value};
 
-use super::type_tree::{OpType, RootType, SpaceType};
-use crate::resolve_crate::ResolveCrate;
+use resolve_calling_crate::ResolveCrate;
 
 #[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct Styled {
