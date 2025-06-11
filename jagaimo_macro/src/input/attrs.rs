@@ -6,7 +6,7 @@ use syn::{Ident, Lit};
 use syn::{bracketed, parenthesized};
 
 use super::enforce_str_nc;
-use crate::resolve_crate::ResolveCrate;
+use resolve_calling_crate::ResolveCrate;
 
 #[derive(Debug)]
 pub struct Attrs {

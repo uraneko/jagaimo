@@ -226,11 +226,9 @@ impl ExpandingCommandRule {
                 self.ops.push(direct_from_str(root_name));
             }
             [true, false] => {
-                println!("nospace/op, {:?}|{:?}", self.spaces, self.ops);
                 self.spaces.push(Ident::new(root_name, Span::call_site()));
             }
             [false, true] => {
-                println!("nospace/op, {:?}|{:?}", self.spaces, self.ops);
                 self.spaces.iter().for_each(|s| {
                     self.ops.push(direct_from_ident(s));
                 });

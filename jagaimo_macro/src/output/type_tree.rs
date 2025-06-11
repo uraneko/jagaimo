@@ -3,15 +3,28 @@ use std::collections::{HashMap, HashSet};
 use proc_macro2::{Span, TokenStream as TS2};
 use quote::quote;
 use syn::{Ident, Type};
-use toml::Table;
 
-use super::help::{Excavator, ExtractHelp, Help, OpHelp, RootHelp, SpaceHelp};
 use super::{AliasedToken, TokenizedCommand};
 
-// TODO instead of fixing operations naming conflicts
-// should use a module for every space
-// that way op names can be duplicated
-// and generated code structure would be clearer
+// TODO make all operations as only struct variants of the space enums
+// not structs types of their own
+//
+// TODO
+// make direct operations inherit the space name they belong to
+// e.g., collections space's direct op would be the enum variant Collections { Collections {...}  }
+//
+// TODO if a space has only 1 operation
+// then in the generated code, that should become a direct operation of root
+// RootName { SpaceOperation { ... } }
+//
+// TODO
+// inject help flag on all operations
+// inject help flag on all direct operations of spaces
+// if a space has no direct operation, inject one for the help
+// additionally inject root version flag
+//
+// TODO make derives quote an option
+// so that the whole quote disappers if no derives
 
 #[derive(Debug, Clone)]
 pub struct TypeTree<'a> {
@@ -139,23 +152,6 @@ pub struct RootType<'a> {
 }
 
 impl RootType<'_> {
-    fn help(&self, toml: &Table) -> TS2 {
-        let excav = Excavator::<RootHelp>::new(None, None, toml);
-        let help = excav.extract();
-
-        // version
-        quote! {
-            fn version() -> Option<String> {
-                let [mut name, version] = ResolveCrate::new().read_manifest().crate_name_version();
-
-                name.push_str(" ");
-                name.push_str(&version);
-
-                Some(name)
-            }
-        }
-    }
-
     fn render(self, derives: &[Ident]) -> TS2 {
         let ident = self.ident;
         let count =
@@ -165,7 +161,6 @@ impl RootType<'_> {
             if let Some(op) = self.direct_op {
                 let op = op.render_fields();
 
-                println!("0-0");
                 return quote! {
                     # [derive( #(#derives,)* )]
                     struct #ident {
@@ -189,7 +184,6 @@ impl RootType<'_> {
                     })
                     .unwrap();
 
-                println!("0-1");
                 return quote! {
                     # [derive( #(#derives,)* )]
                     pub struct #ident {
@@ -206,7 +200,6 @@ impl RootType<'_> {
                     .map(|op| op.render_fields())
                     .unwrap();
 
-                println!("0-2");
                 return quote! {
                     # [derive( #(#derives,)* )]
                     pub struct #ident {
@@ -218,30 +211,39 @@ impl RootType<'_> {
             let direct_variant = self
                 .direct_op
                 .clone()
-                .map(|op| (op.token.ident(), op.render_fields()))
+                .map(|op| {
+                    (
+                        {
+                            Ident::new(
+                                &op.token
+                                    .ident()
+                                    .unwrap()
+                                    .to_string()
+                                    .replace("DirectOp", ""),
+                                Span::call_site(),
+                            )
+                        },
+                        op.render_fields(),
+                    )
+                })
                 .map(|(i, f)| quote! { #i { #f }});
-            let direct = self.direct_op.map(|op| op.render(derives));
+            let direct = self.direct_op.map(|op| op.render());
 
             let op_variants = self
                 .ops
                 .clone()
                 .into_iter()
-                .map(|op| op.token.ident())
-                .map(|i| quote! { #i ( #i ) });
-            let ops = self.ops.into_iter().map(|op| op.render(derives));
+                .map(|op| op.render())
+                .map(|op| quote! { #op });
+            let ops = self.ops.into_iter().map(|op| op.render());
 
             let space_variants = self
                 .spaces
                 .clone()
                 .into_iter()
                 .map(|scp| scp.render_variant());
-            let spaces = self
-                .spaces
-                .into_iter()
-                .map(|spc| spc.render(derives))
-                .inspect(|ts| println!("{}", ts));
+            let spaces = self.spaces.into_iter().map(|spc| spc.render(derives));
 
-            println!("1");
             return quote! {
                 # [derive( #(#derives,)* )]
                 pub enum #ident {
@@ -249,8 +251,6 @@ impl RootType<'_> {
                     #(#op_variants,)*
                     #direct_variant
                 }
-
-                #(#ops)*
 
                 #(#spaces)*
             };
@@ -320,7 +320,10 @@ impl<'a> SpaceType<'a> {
                 self.ops.into_iter().next().unwrap()
             };
             let opi = if op.token.is_direct_op() {
-                ident
+                Ident::new(
+                    &ident.to_string().replace("DirectOp", ""),
+                    Span::call_site(),
+                )
             } else {
                 Ident::new(
                     &(ident.to_string() + &op.token.ident().unwrap().to_string()),
@@ -336,7 +339,7 @@ impl<'a> SpaceType<'a> {
         } else {
             let ident = self.token.ident().unwrap().clone();
             return quote! {
-                #ident ( #module_name :: #ident )
+                #ident ( #ident )
             };
         }
     }
@@ -374,7 +377,7 @@ impl<'a> SpaceType<'a> {
                 .clone()
                 .map(|op| op.token.ident())
                 .map(|i| quote! { #i ( #i )});
-            let direct = self.direct_op.map(|op| op.render(derives));
+            let direct = self.direct_op.map(|op| op.render());
 
             let op_variants = self
                 .ops
@@ -382,27 +385,19 @@ impl<'a> SpaceType<'a> {
                 .into_iter()
                 .map(|op| op.token.ident())
                 .map(|i| quote! { #i ( #i ) });
-            let ops = self.ops.into_iter().map(|op| op.render(derives));
+            let ops = self.ops.into_iter().map(|op| op.render());
 
             quote! {
                 #[derive( #(#derives,)* )]
                 pub enum #ident {
-                    #(#op_variants,)*
-                    #direct_variant
-
-                }
-
-                    #(#ops)*
-
+                    #(#ops,)*
                     #direct
-
+                }
             }
         };
 
         quote! {
-            pub mod #mod_ident {
-                #space_type
-            }
+            #space_type
         }
     }
 }
@@ -451,8 +446,9 @@ impl<'a> OpType<'a> {
         }
     }
 
-    fn render(self, derives: &[Ident]) -> TS2 {
+    fn render(self) -> TS2 {
         let ident = self.token.ident();
+        let len = if self.params.is_some() { 1 } else { 0 } + self.fields.len();
         let fields = self.fields.into_iter().map(|atok| {
             let f = atok.flag().unwrap();
             let ident = f.ident();
@@ -466,11 +462,14 @@ impl<'a> OpType<'a> {
             quote! { params: #ty }
         });
 
-        quote! {
-            #[derive( #(#derives,)* )]
-            pub struct #ident {
-                #(#fields,)*
-                #params
+        if len == 0 {
+            quote! { #ident }
+        } else {
+            quote! {
+                #ident {
+                    #(#fields,)*
+                    #params
+                }
             }
         }
     }

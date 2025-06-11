@@ -4,16 +4,11 @@ use syn::parse::Parser;
 
 mod input;
 mod output;
-mod resolve_crate;
 
 use input::parse_attrs_rules;
 
 #[proc_macro]
 pub fn jagaimo(stream: TokenStream) -> TokenStream {
-    let map = &output::help::read_help()["descriptions"]["collections"]["add"];
-
-    panic!("{:#?}", map);
-
     // set parser fn that impl Parser trait
     let parser = parse_attrs_rules;
     // parse input using Parser::parse(TokenStream)
@@ -27,41 +22,22 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
         };
         panic!("failed to parse proc-macro input\n[E] -> {}", e);
     };
-    // print the attributes
-    // println!("{:#?}", attrs);
 
     // resolve bare spaces and operations in command rules
     let mut rules = rules.commands_resolution(attrs.root_name(), attrs.ignore_nc());
     // resolve name conflicts of operations
-    // rules.resolve_operations_naming_conflicts();
 
     // print the command rules
-    // for cmd in rules.cmd_ref() {
-    //     println!("{}", cmd);
-    // }
 
     // auto generate additional alias rules if necessary
     rules.alias_generator(attrs.auto_alias());
 
-    // print all alias rules
-    // for al in rules.alias_ref() {
-    //     println!("{}", al);
-    // }
-
-    // println!();
-
     let tok_cmds = rules.cmds_tokenizer();
-    // for tcmd in tok_cmds {
-    //     println!("{}\n", tcmd);
-    // }
 
-    // quote! {}.into()
+    let q = rules.type_tree_renderer(attrs.root_name(), attrs.derives());
 
-    let table = output::help::read_help();
-
-    rules
-        .type_tree_renderer(attrs.root_name(), attrs.derives())
-        .into()
+    println!("{}", q);
+    q.into()
 }
 
 // output
