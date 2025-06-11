@@ -25,9 +25,9 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
 
     // resolve bare spaces and operations in command rules
     let mut rules = rules.commands_resolution(attrs.root_name(), attrs.ignore_nc());
-    // resolve name conflicts of operations
 
-    // print the command rules
+    // add help and version root operations
+    rules.inject_version_help(attrs.root_name());
 
     // auto generate additional alias rules if necessary
     rules.alias_generator(attrs.auto_alias());

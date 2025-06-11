@@ -6,25 +6,22 @@ use syn::{Ident, Type};
 
 use super::{AliasedToken, TokenizedCommand};
 
-// TODO make all operations as only struct variants of the space enums
-// not structs types of their own
-//
 // TODO
-// make direct operations inherit the space name they belong to
-// e.g., collections space's direct op would be the enum variant Collections { Collections {...}  }
+// inject help and version root operations
+// help is only for root type
+// and takes a scope that tells it which help to generate
+// this would need the transform rules to be implemented so that
+// any command containing --help
+// can be transformed from
+// cli space op flags params --help
+// into
+// cli help space op
 //
-// TODO if a space has only 1 operation
-// then in the generated code, that should become a direct operation of root
-// RootName { SpaceOperation { ... } }
-//
+// same thing for version
+
 // TODO
-// inject help flag on all operations
-// inject help flag on all direct operations of spaces
-// if a space has no direct operation, inject one for the help
-// additionally inject root version flag
-//
-// TODO make derives quote an option
-// so that the whole quote disappers if no derives
+// aliases are only needed to be passed on to the Help derive as a list attr
+// they dont need to exist before or after that
 
 #[derive(Debug, Clone)]
 pub struct TypeTree<'a> {
@@ -151,8 +148,19 @@ pub struct RootType<'a> {
     direct_op: Option<OpType<'a>>,
 }
 
+fn generate_derives(d: &[Ident]) -> Option<TS2> {
+    if d.is_empty() {
+        None
+    } else {
+        Some(quote! {
+            # [derive( #(#d,)* )]
+        })
+    }
+}
+
 impl RootType<'_> {
     fn render(self, derives: &[Ident]) -> TS2 {
+        let derive = generate_derives(derives);
         let ident = self.ident;
         let count =
             self.spaces.len() + self.ops.len() + if self.direct_op.is_some() { 1 } else { 0 };
@@ -162,7 +170,7 @@ impl RootType<'_> {
                 let op = op.render_fields();
 
                 return quote! {
-                    # [derive( #(#derives,)* )]
+                    #derive
                     struct #ident {
                         #op
                     }
@@ -185,7 +193,7 @@ impl RootType<'_> {
                     .unwrap();
 
                 return quote! {
-                    # [derive( #(#derives,)* )]
+                    #derive
                     pub struct #ident {
                         #field
                     }
@@ -201,7 +209,7 @@ impl RootType<'_> {
                     .unwrap();
 
                 return quote! {
-                    # [derive( #(#derives,)* )]
+                    #derive
                     pub struct #ident {
                         #op
                     }
@@ -245,7 +253,7 @@ impl RootType<'_> {
             let spaces = self.spaces.into_iter().map(|spc| spc.render(derives));
 
             return quote! {
-                # [derive( #(#derives,)* )]
+                #derive
                 pub enum #ident {
                     #(#space_variants,)*
                     #(#op_variants,)*
@@ -345,6 +353,7 @@ impl<'a> SpaceType<'a> {
     }
 
     fn render(self, derives: &[Ident]) -> TS2 {
+        let derives = generate_derives(derives);
         let ident = self.token.ident().unwrap();
         let mod_ident = self.module_name();
 
@@ -366,7 +375,7 @@ impl<'a> SpaceType<'a> {
             let fields = op.render_fields();
             // TODO let ident = ident + op ident ;
             quote! {
-                #[derive( #(#derives,)* )]
+                #derives
                 pub struct #ident {
                     #fields
                 }
@@ -388,7 +397,7 @@ impl<'a> SpaceType<'a> {
             let ops = self.ops.into_iter().map(|op| op.render());
 
             quote! {
-                #[derive( #(#derives,)* )]
+                #derives
                 pub enum #ident {
                     #(#ops,)*
                     #direct

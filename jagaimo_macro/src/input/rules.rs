@@ -117,6 +117,12 @@ impl Rules {
 }
 
 impl Rules {
+    pub fn inject_version_help(&mut self, root_name: &str) {
+        let i = Ident::new(root_name, Span::call_site());
+        self.cmd
+            .extend([CommandRule::help(i.clone()), CommandRule::version(i)]);
+    }
+
     pub fn alias_generator(&mut self, auto_alias: bool) {
         if !auto_alias {
             return;

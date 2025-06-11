@@ -24,6 +24,28 @@ pub struct CommandRule {
     params: Option<Type>,
 }
 
+impl CommandRule {
+    pub fn help(root_ident: Ident) -> Self {
+        Self {
+            is_of_root: true,
+            space: root_ident,
+            op: Ident::new("Help", Span::call_site()),
+            flags: None,
+            params: Some(Type::Verbatim("Scope".parse().unwrap())),
+        }
+    }
+
+    pub fn version(root_ident: Ident) -> Self {
+        Self {
+            is_of_root: true,
+            space: root_ident,
+            op: Ident::new("Version", Span::call_site()),
+            flags: None,
+            params: None,
+        }
+    }
+}
+
 // WARN 2 command rules that have the same scope (space and op)
 // should be considered equal reagrdless of their context
 
