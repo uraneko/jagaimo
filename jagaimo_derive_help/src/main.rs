@@ -1,17 +1,30 @@
 use jagaimo_derive_help::Help;
 
-#[derive(Debug, Clone, Help)]
-struct Examplary {
-    one: u8,
-    _2: String,
-    三: EvenMoreSo,
+// #[derive(Help)]
+// struct Examplary {
+//     one: u8,
+//     _2: String,
+//     三: EvenMoreSo,
+// }
+
+#[derive(Help)]
+// #[at = ""]
+enum EvenMoreSo {
+    First(First),
+    Second { str: String, int: i16 },
 }
 
-#[derive(Debug, Clone, Help)]
-enum EvenMoreSo {
-    First(bool),
-    Second(String),
-    Third(Vec<u8>),
+#[derive(Help)]
+enum First {
+    One {
+        params: String,
+        attach: bool,
+        hook: bool,
+    },
+    Two {
+        filter: String, 
+        strict: bool,
+    }
 }
 
 fn main() {}
