@@ -4,7 +4,7 @@
 
 # flags cant have descriptions 
 # only spaces and ops can 
-[descripts]
+[descriptions]
 root = "brief description of the cli tool"
 history = "then another for the history space"
 # description of every add operation no matter the space 

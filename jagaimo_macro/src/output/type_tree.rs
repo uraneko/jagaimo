@@ -7,17 +7,15 @@ use syn::{Ident, Type};
 use super::{AliasedToken, TokenizedCommand};
 
 // TODO
-// inject help and version root operations
-// help is only for root type
-// and takes a scope that tells it which help to generate
-// this would need the transform rules to be implemented so that
+// impl transform rules so this can be done
 // any command containing --help
 // can be transformed from
 // cli space op flags params --help
 // into
 // cli help space op
-//
-// same thing for version
+// the parser has no awareness of any flag named --help
+// but the transform rules are applied before the command tokens are passed to the parser
+// so it only sees the help operation
 
 // TODO
 // aliases are only needed to be passed on to the Help derive as a list attr
@@ -31,7 +29,7 @@ pub struct TypeTree<'a> {
 // WARN space and op names are always there because every command needs a space and op names/ids for
 // its states to be reprensented in the type tree
 //  but when figuring the space and op of a command
-//  the valid check is to use is_bare method on scope tokens
+//  the valid check is to use is_direct method on scope tokens
 impl<'a> TypeTree<'a> {
     pub fn new(tcmd: Vec<TokenizedCommand<'a>>, root_name: &str) -> Self {
         let mut iter = tcmd.into_iter();

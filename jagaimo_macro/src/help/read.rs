@@ -29,21 +29,21 @@ pub struct OpHelp {
 }
 
 pub trait ExtractHelp<T> {
-    fn links(&self) -> Option<HashMap<String, String>> {
+    fn links(&self, space: Option<&str>, op: &str) -> Option<HashMap<String, String>> {
         None
     }
 
-    fn description(&self) -> String;
+    fn description(&self, space: Option<&str>, op: &str) -> String;
 
     fn spaces(&self) -> Option<HashMap<String, String>> {
         None
     }
 
-    fn ops(&self) -> Option<HashMap<String, String>> {
+    fn ops(&self, space: Option<&str>) -> Option<HashMap<String, String>> {
         None
     }
 
-    fn flags(&self) -> Option<HashMap<String, String>> {
+    fn flags(&self, space: Option<&str>, op: &str) -> Option<HashMap<String, String>> {
         None
     }
 
@@ -51,15 +51,13 @@ pub trait ExtractHelp<T> {
 }
 
 // FIXME this needs to be in snake case
-pub struct Excavator {
+pub struct ReadTomlHelp {
     toml: toml::Table,
-    space: Option<Ident>,
-    op: Option<Ident>,
 }
 
-impl Excavator {
-    pub fn new(space: Option<Ident>, op: Option<Ident>, toml: toml::Table) -> Self {
-        Self { toml, space, op }
+impl ReadTomlHelp {
+    pub fn new(toml: toml::Table) -> Self {
+        Self { toml, }
     }
 }
 
@@ -83,18 +81,14 @@ fn op_fallback_desc(space: &Ident, op: &Ident) -> String {
     format!("the {} operation from the {} namespace", op, space)
 }
 
-impl ExtractHelp<OpHelp> for Excavator {
-    fn links(&self) -> Option<HashMap<String, String>> {
+impl ExtractHelp<OpHelp> for ReadTomlHelp {
+    fn links(&self, space: &str,op: &str) -> Option<HashMap<String, String>> {
         let links = self.toml.get("links");
         if links.is_none() {
             return None;
         }
         let links = links.unwrap();
 
-        let [space, op] = [
-            self.space.as_ref().map(|s| s.to_string()).unwrap(),
-            self.op.as_ref().map(|o| o.to_string()).unwrap(),
-        ];
 
         let space = links.get(space);
         if let Some(tbl) = space {
@@ -111,7 +105,7 @@ impl ExtractHelp<OpHelp> for Excavator {
         None
     }
 
-    fn flags(&self) -> Option<HashMap<String, String>> {
+    fn flags(&self, space: Option<&str>, op: Option<&str>) -> Option<HashMap<String, String>> {
         let flags = self.toml.get("flags");
         if flags.is_none() {
             return None;
@@ -171,7 +165,7 @@ impl ExtractHelp<OpHelp> for Excavator {
     }
 
     fn extract(self) -> OpHelp {
-        let description = <Excavator as ExtractHelp<OpHelp>>::description(&self);
+        let description = <ReadTomlHelp as ExtractHelp<OpHelp>>::description(&self);
         let flags = <Self as ExtractHelp<OpHelp>>::flags(&self);
         let links = <Self as ExtractHelp<OpHelp>>::links(&self);
 
@@ -187,7 +181,7 @@ fn space_fallback_desc(space: &Ident) -> String {
     format!("the {} namespace", space)
 }
 
-impl<'a> ExtractHelp<SpaceHelp> for Excavator {
+impl<'a> ExtractHelp<SpaceHelp> for ReadTomlHelp {
     fn links(&self) -> Option<HashMap<String, String>> {
         let links = self.toml.get("links");
         if links.is_none() {
@@ -252,7 +246,7 @@ impl<'a> ExtractHelp<SpaceHelp> for Excavator {
     }
 
     fn extract(self) -> SpaceHelp {
-        let description = <Excavator as ExtractHelp<SpaceHelp>>::description(&self);
+        let description = <ReadTomlHelp as ExtractHelp<SpaceHelp>>::description(&self);
         let flags = <Self as ExtractHelp<SpaceHelp>>::flags(&self);
         let links = <Self as ExtractHelp<SpaceHelp>>::links(&self);
         let ops = <Self as ExtractHelp<SpaceHelp>>::ops(&self);
@@ -270,7 +264,7 @@ fn root_fallback_desc(space: &Ident) -> String {
     format!("the {} cli tool", space)
 }
 
-impl<'a> ExtractHelp<RootHelp> for Excavator {
+impl<'a> ExtractHelp<RootHelp> for ReadTomlHelp {
     fn links(&self) -> Option<HashMap<String, String>> {
         let links = self.toml.get("links");
         if links.is_none() {
@@ -336,7 +330,7 @@ impl<'a> ExtractHelp<RootHelp> for Excavator {
     }
 
     fn extract(self) -> RootHelp {
-        let description = <Excavator as ExtractHelp<RootHelp>>::description(&self);
+        let description = <ReadTomlHelp as ExtractHelp<RootHelp>>::description(&self);
         let flags = <Self as ExtractHelp<RootHelp>>::flags(&self);
         let links = <Self as ExtractHelp<RootHelp>>::links(&self);
         let ops = <Self as ExtractHelp<RootHelp>>::ops(&self);

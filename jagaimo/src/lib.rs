@@ -1,16 +1,13 @@
 use jagaimo_macro::jagaimo;
 
 jagaimo! {
-
     #[
-        no_help,
-        no_version,
         nu_cmp,
         fish_cmp,
         root_name = "jagaimo_n",
         // ignore_naming_conventions,
         // no_auto_alias,
-        derives(Debug, Clone),
+        derives(),
     ]
 
     o(add) = A

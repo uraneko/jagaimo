@@ -2,6 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::parse::Parser;
 
+mod help;
 mod input;
 mod output;
 

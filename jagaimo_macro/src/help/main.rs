@@ -1,20 +1,15 @@
 use jagaimo_derive_help::Help;
 
-// #[derive(Help)]
-// struct Examplary {
-//     one: u8,
-//     _2: String,
-//     三: EvenMoreSo,
-// }
+const ةساط: u8 = 189;
 
 #[derive(Help)]
 // #[at = ""]
+#[aliases { s(collections) = colls, o(list) = l, o(view) = v, o(obfuscate) = o, s(history) = hist, f(filter) = f }]
 enum EvenMoreSo {
     First(First),
     Second { str: String, int: i16 },
 }
 
-#[derive(Help)]
 enum First {
     One {
         params: String,
