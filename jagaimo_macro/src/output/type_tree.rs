@@ -5,6 +5,9 @@ use quote::quote;
 use syn::{Ident, Type};
 
 use super::{AliasedToken, TokenizedCommand};
+use crate::help::{ExtractHelp, Extractor, Help, OpHelp, RootHelp, SpaceHelp};
+
+use toml::Table;
 
 // TODO
 // impl transform rules so this can be done
@@ -72,6 +75,54 @@ impl<'a> TypeTree<'a> {
         };
 
         Self { root }
+    }
+
+    // calls all subordinate type.help methods
+    // returns root type Help trait impl quote
+    pub fn help(self, toml: Table) -> TS2 {
+        let root = self.root.help(&toml);
+        let ri = &self.root.ident;
+        let root = quote! { [#ri, ""] => #root };
+        let rops = self
+            .root
+            .ops
+            .into_iter()
+            .map(|op| (ri, op.token.ident().unwrap(), op.help(Some(ri), &toml)))
+            .map(|(i, o, h)| quote! { [#i, #o] => #h });
+
+        let spaces = self
+            .root
+            .spaces
+            .clone()
+            .into_iter()
+            .map(|s| (s.token.ident().unwrap(), s.help(&toml)))
+            .map(|(i, h)| quote! { [#i, ""] => #h });
+
+        let ops = self
+            .root
+            .spaces
+            .into_iter()
+            .map(|s| {
+                let tom = toml.clone();
+                let i = s.token.ident();
+                s.ops
+                    .into_iter()
+                    .map(move |op| (i.unwrap(), op.token.ident().unwrap(), op.help(i, &tom)))
+                    .map(|(s, o, h)| quote! { [#s, #o] => #h })
+            })
+            .flatten();
+        let arms = [root].into_iter().chain(rops).chain(spaces).chain(ops);
+
+        quote! {
+            impl Help for #ri {
+                fn help(self, space: &str, op: &str) -> String {
+                    match [space, op] {
+                        #(#arms,)*
+                        [s, o] => format("got unrecognized namespace or operation; {}, {}", s, o),
+                    }
+                }
+            }
+        }
     }
 
     pub fn render(self, derives: &[Ident]) -> TS2 {
@@ -157,6 +208,22 @@ fn generate_derives(d: &[Ident]) -> Option<TS2> {
 }
 
 impl RootType<'_> {
+    // generates the entire tree's help data
+    // then implements the Help trait on the root type
+    fn help(&self, toml: &Table) -> String {
+        let extr = Extractor::new(Some(&self.ident), None, toml);
+        let help: RootHelp = extr.extract(
+            self.direct_op
+                .as_ref()
+                .map(|o| o.params.is_some())
+                .unwrap_or(false),
+            self.direct_op.is_some(),
+        );
+
+        help.fmt()
+    }
+
+    // renders the type tree as rust structs and enums
     fn render(self, derives: &[Ident]) -> TS2 {
         let derive = generate_derives(derives);
         let ident = self.ident;
@@ -350,6 +417,20 @@ impl<'a> SpaceType<'a> {
         }
     }
 
+    // returns the help match arm quote for this space
+    fn help(&self, toml: &Table) -> String {
+        let extr = Extractor::new(self.token.ident(), None, toml);
+        let help: SpaceHelp = extr.extract(
+            self.direct_op
+                .as_ref()
+                .map(|o| o.params.is_some())
+                .unwrap_or(false),
+            self.direct_op.is_some(),
+        );
+
+        help.fmt()
+    }
+
     fn render(self, derives: &[Ident]) -> TS2 {
         let derives = generate_derives(derives);
         let ident = self.token.ident().unwrap();
@@ -451,6 +532,15 @@ impl<'a> OpType<'a> {
             #(#fields,)*
             #params
         }
+    }
+
+    // returns the help match arm for this op
+    fn help(&self, s: Option<&Ident>, toml: &Table) -> String {
+        let o = self.token.ident();
+        let extr = Extractor::new(s, o, toml);
+        let help: OpHelp = extr.extract(self.params.is_some(), false);
+
+        help.fmt()
     }
 
     fn render(self) -> TS2 {

@@ -35,10 +35,17 @@ pub fn jagaimo(stream: TokenStream) -> TokenStream {
 
     let tok_cmds = rules.cmds_tokenizer();
 
-    let q = rules.type_tree_renderer(attrs.root_name(), attrs.derives());
+    let tt = rules.type_tree_renderer(attrs.root_name(), attrs.derives());
+    let help = rules.root_type_help_implementor(attrs.root_name());
 
-    println!("{}", q);
-    q.into()
+    println!(">>{}<<", help);
+
+    quote! {
+        #tt
+
+        #help
+    }
+    .into()
 }
 
 // output

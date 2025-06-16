@@ -6,6 +6,7 @@ use syn::parse::{Parse, ParseStream, Result as PRes};
 
 use super::scope::{Context, Scope};
 use super::{AliasScope, Flag};
+use crate::help::read_help;
 use crate::output::AliasGenerator;
 use crate::output::TypeTree;
 use crate::output::{AliasLookup, TokenizedCommand};
@@ -145,6 +146,12 @@ impl Rules {
 
     pub fn type_tree_renderer(&self, root_name: &str, derives: &[Ident]) -> TS2 {
         TypeTree::new(self.cmds_tokenizer(), root_name).render(derives)
+    }
+
+    pub fn root_type_help_implementor(&self, root_name: &str) -> TS2 {
+        let toml = read_help();
+
+        TypeTree::new(self.cmds_tokenizer(), root_name).help(toml)
     }
 }
 
